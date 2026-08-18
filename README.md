@@ -5,15 +5,15 @@ A minimal two-player browser game and generic shared-state API designed to deplo
 ## How it works
 
 - The static browser app polls `GET /api/state` every 500 ms while its tab is visible.
-- Conditional `ETag` requests return `304 Not Modified` with no JSON body when nothing changed.
+- Versioned requests return `204 No Content` with no JSON body when nothing changed.
 - The browser writes an RFC 7396 JSON Merge Patch rather than the complete state. It uses `application/json` so Vercel parses the request body consistently.
-- `If-Match` prevents one player from silently overwriting a concurrent move. The client receives the latest state and retries the move up to four times.
+- `X-State-Version` prevents one player from silently overwriting a concurrent move. The client receives the latest state and retries the move up to four times.
 - The API keeps one JSON object on `globalThis` in the Vercel function process.
 - There is deliberately no authentication, database, room system, or player ownership enforcement.
 
 ## Important limitation
 
-This version uses function memory because that storage option was selected. Vercel does **not** guarantee that requests use the same function instance. State is lost on a cold start and can diverge if the two iPads reach different instances. The instance ID is part of the `ETag`, which lets a browser detect an instance change, but it cannot make two separate instances share memory.
+This version uses function memory because that storage option was selected. Vercel does **not** guarantee that requests use the same function instance. State is lost on a cold start and can diverge if the two iPads reach different instances. The instance ID is part of `X-State-Version`, which lets a browser detect an instance change, but it cannot make two separate instances share memory.
 
 This is suitable for experimentation, but it may occasionally fail even with honest players. The smallest reliable upgrade is a free Upstash Redis integration; the browser API can remain unchanged and only `server/state-store.ts` needs replacement.
 
@@ -50,22 +50,22 @@ The state handler is game-agnostic. Its entire state is one JSON object.
 
 ```http
 GET /api/state
-If-None-Match: "instance:revision"
+X-State-Version: "instance:revision"
 ```
 
-Returns the complete state with an `ETag`, or `304` with no body when unchanged.
+Returns the complete state with `X-State-Version`, or `204` with no body when unchanged.
 
 ### Update
 
 ```http
 PATCH /api/state
 Content-Type: application/json
-If-Match: "instance:revision"
+X-State-Version: "instance:revision"
 
 {"players":{"one":{"taps":4}},"totalTaps":7}
 ```
 
-Returns the updated state and new `ETag`. A stale `If-Match` returns `412 Precondition Failed` plus the current state, allowing the browser to retry its change.
+Returns the updated state and a new `X-State-Version`. A stale version returns `412 Precondition Failed` plus the current state, allowing the browser to retry its change.
 
 JSON Merge Patch uses `null` to remove an object property, so game state must not rely on object properties whose stored value is `null`. Null values inside arrays are unaffected.
 

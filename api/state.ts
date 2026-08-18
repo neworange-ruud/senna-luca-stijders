@@ -33,13 +33,13 @@ function sendState(response: FunctionResponse, status: number): void {
   response
     .status(status)
     .setHeader("Cache-Control", "no-store")
-    .setHeader("ETag", runtime.store.etag)
+    .setHeader("X-State-Version", runtime.store.etag)
     .json(runtime.store.read());
 }
 
 function requestHeader(
   request: FunctionRequest,
-  name: "if-match" | "if-none-match",
+  name: "x-state-version",
 ): string | undefined {
   const value = request.headers[name];
   return Array.isArray(value) ? value[0] : value;
@@ -66,8 +66,8 @@ export default function handler(
   response.setHeader("Cache-Control", "no-store");
 
   if (request.method === "GET") {
-    if (requestHeader(request, "if-none-match") === runtime.store.etag) {
-      response.status(304).end();
+    if (requestHeader(request, "x-state-version") === runtime.store.etag) {
+      response.status(204).end();
       return;
     }
 
@@ -76,9 +76,9 @@ export default function handler(
   }
 
   if (request.method === "PATCH") {
-    const expectedVersion = requestHeader(request, "if-match");
+    const expectedVersion = requestHeader(request, "x-state-version");
     if (!expectedVersion) {
-      response.status(428).json({ error: "An If-Match header is required." });
+      response.status(428).json({ error: "An X-State-Version header is required." });
       return;
     }
 

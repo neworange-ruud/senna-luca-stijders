@@ -45,27 +45,27 @@ describe("state API", () => {
 
     expect(initial.statusCode).toBe(200);
     expect(initial.body).toMatchObject({ players: {}, totalTaps: 0 });
-    const firstTag = initial.headers.get("etag")!;
+    const firstTag = initial.headers.get("x-state-version")!;
 
     const unchanged = response();
-    handler(request("GET", { "if-none-match": firstTag }), unchanged);
-    expect(unchanged.statusCode).toBe(304);
+    handler(request("GET", { "x-state-version": firstTag }), unchanged);
+    expect(unchanged.statusCode).toBe(204);
     expect(unchanged.body).toBeUndefined();
 
     const stale = response();
     handler(
-      request("PATCH", { "if-match": '"different:0"' }, { totalTaps: 1 }),
+      request("PATCH", { "x-state-version": '"different:0"' }, { totalTaps: 1 }),
       stale,
     );
     expect(stale.statusCode).toBe(412);
 
     const update = response();
     handler(
-      request("PATCH", { "if-match": firstTag }, { totalTaps: 1 }),
+      request("PATCH", { "x-state-version": firstTag }, { totalTaps: 1 }),
       update,
     );
     expect(update.statusCode).toBe(200);
     expect(update.body).toMatchObject({ totalTaps: 1 });
-    expect(update.headers.get("etag")).not.toBe(firstTag);
+    expect(update.headers.get("x-state-version")).not.toBe(firstTag);
   });
 });

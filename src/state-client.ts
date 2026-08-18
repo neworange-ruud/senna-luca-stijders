@@ -75,7 +75,7 @@ export class StateClient {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            "If-Match": this.etag,
+            "X-State-Version": this.etag,
           },
           body: JSON.stringify(patch),
         });
@@ -106,11 +106,11 @@ export class StateClient {
   private async refresh(): Promise<void> {
     this.emitStatus("connecting");
     const headers: HeadersInit = {};
-    if (this.etag) headers["If-None-Match"] = this.etag;
+    if (this.etag) headers["X-State-Version"] = this.etag;
 
     try {
       const response = await fetch(this.url, { headers, cache: "no-store" });
-      if (response.status === 304) {
+      if (response.status === 204) {
         this.emitStatus("connected");
         return;
       }
@@ -128,7 +128,7 @@ export class StateClient {
 
   private async acceptState(response: Response): Promise<void> {
     const value: unknown = await response.json();
-    const etag = response.headers.get("ETag");
+    const etag = response.headers.get("X-State-Version");
 
     if (!isJsonObject(value) || !etag) {
       throw new Error("The state server returned an invalid response.");
