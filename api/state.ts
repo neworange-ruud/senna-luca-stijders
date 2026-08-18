@@ -1,5 +1,5 @@
-import { isJsonObject, isJsonValue, type JsonObject } from "../src/protocol";
-import { StateStore } from "../server/state-store";
+import { isJsonObject, isJsonValue, type JsonObject } from "../src/protocol.js";
+import { StateStore } from "../server/state-store.js";
 
 export type FunctionRequest = {
   method?: string;

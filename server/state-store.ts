@@ -2,7 +2,7 @@ import {
   applyMergePatch,
   isJsonObject,
   type JsonObject,
-} from "../src/protocol";
+} from "../src/protocol.js";
 
 export class StateStore {
   readonly instanceId = Math.random().toString(36).slice(2, 10);
