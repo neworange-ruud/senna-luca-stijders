@@ -1,5 +1,10 @@
+import { Redis } from "@upstash/redis";
 import { isJsonObject, isJsonValue, type JsonObject } from "../src/protocol.js";
-import { StateStore } from "../server/state-store.js";
+import {
+  StateStore,
+  type StateSnapshot,
+  type StateStoreContract,
+} from "../server/state-store.js";
 
 export type FunctionRequest = {
   method?: string;
@@ -14,27 +19,40 @@ export type FunctionResponse = {
   end(): void;
 };
 
-type Runtime = {
-  store: StateStore;
-};
+let redisStore: StateStore | undefined;
 
-const server = globalThis as typeof globalThis & {
-  __multiplayerGameRuntime?: Runtime;
-};
+function getRedisStore(): StateStore {
+  if (!redisStore) {
+    const environment = (
+      process.env.VERCEL_TARGET_ENV ??
+      process.env.VERCEL_ENV ??
+      "development"
+    ).replaceAll(/[^a-zA-Z0-9_-]/g, "_");
+    const redis = Redis.fromEnv({
+      automaticDeserialization: false,
+      enableTelemetry: false,
+      readYourWrites: true,
+      retry: false,
+    });
+    redisStore = new StateStore(redis, `browsergame:state:${environment}:v1`, {
+      players: {},
+      totalTaps: 0,
+    });
+  }
 
-const runtime = (server.__multiplayerGameRuntime ??= {
-  store: new StateStore({
-    players: {},
-    totalTaps: 0,
-  }),
-});
+  return redisStore;
+}
 
-function sendState(response: FunctionResponse, status: number): void {
+function sendState(
+  response: FunctionResponse,
+  status: number,
+  snapshot: StateSnapshot,
+): void {
   response
     .status(status)
     .setHeader("Cache-Control", "no-store")
-    .setHeader("X-State-Version", runtime.store.etag)
-    .json(runtime.store.read());
+    .setHeader("X-State-Version", snapshot.version)
+    .json(snapshot.state);
 }
 
 function requestHeader(
@@ -59,45 +77,55 @@ function parsePatch(body: unknown): JsonObject | undefined {
   return isJsonObject(parsed) && isJsonValue(parsed) ? parsed : undefined;
 }
 
-export default function handler(
-  request: FunctionRequest,
-  response: FunctionResponse,
-): void {
-  response.setHeader("Cache-Control", "no-store");
+export function createHandler(store: StateStoreContract) {
+  return async function handler(
+    request: FunctionRequest,
+    response: FunctionResponse,
+  ): Promise<void> {
+    response.setHeader("Cache-Control", "no-store");
 
-  if (request.method === "GET") {
-    if (requestHeader(request, "x-state-version") === runtime.store.etag) {
-      response.status(204).end();
-      return;
+    try {
+      if (request.method === "GET") {
+        const snapshot = await store.read();
+        if (requestHeader(request, "x-state-version") === snapshot.version) {
+          response.status(204).end();
+          return;
+        }
+
+        sendState(response, 200, snapshot);
+        return;
+      }
+
+      if (request.method === "PATCH") {
+        const expectedVersion = requestHeader(request, "x-state-version");
+        if (!expectedVersion) {
+          response.status(428).json({ error: "An X-State-Version header is required." });
+          return;
+        }
+
+        const patch = parsePatch(request.body);
+        if (!patch) {
+          response.status(400).json({ error: "The body must be a JSON object." });
+          return;
+        }
+
+        const result = await store.merge(expectedVersion, patch);
+        sendState(response, result.applied ? 200 : 412, result.snapshot);
+        return;
+      }
+
+      response.setHeader("Allow", "GET, PATCH");
+      response.status(405).json({ error: "Method not allowed." });
+    } catch (error) {
+      console.error("State store request failed", error);
+      response.status(503).json({ error: "The state store is temporarily unavailable." });
     }
-
-    sendState(response, 200);
-    return;
-  }
-
-  if (request.method === "PATCH") {
-    const expectedVersion = requestHeader(request, "x-state-version");
-    if (!expectedVersion) {
-      response.status(428).json({ error: "An X-State-Version header is required." });
-      return;
-    }
-
-    if (expectedVersion !== runtime.store.etag) {
-      sendState(response, 412);
-      return;
-    }
-
-    const patch = parsePatch(request.body);
-    if (!patch) {
-      response.status(400).json({ error: "The body must be a JSON object." });
-      return;
-    }
-
-    runtime.store.merge(patch);
-    sendState(response, 200);
-    return;
-  }
-
-  response.setHeader("Allow", "GET, PATCH");
-  response.status(405).json({ error: "Method not allowed." });
+  };
 }
+
+const handler = createHandler({
+  read: () => getRedisStore().read(),
+  merge: (expectedVersion, patch) => getRedisStore().merge(expectedVersion, patch),
+});
+
+export default handler;

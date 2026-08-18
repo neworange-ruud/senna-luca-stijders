@@ -8,14 +8,30 @@ A minimal two-player browser game and generic shared-state API designed to deplo
 - Versioned requests return `204 No Content` with no JSON body when nothing changed.
 - The browser writes an RFC 7396 JSON Merge Patch rather than the complete state. It uses `application/json` so Vercel parses the request body consistently.
 - `X-State-Version` prevents one player from silently overwriting a concurrent move. The client receives the latest state and retries the move up to four times.
-- The API keeps one JSON object on `globalThis` in the Vercel function process.
-- There is deliberately no authentication, database, room system, or player ownership enforcement.
+- Upstash Redis holds one shared JSON object and revision for every Vercel function instance.
+- A Redis Lua compare-and-set makes revision checking and state replacement atomic.
+- There is deliberately no authentication, room system, or player ownership enforcement.
 
-## Important limitation
+## Upstash Redis
 
-This version uses function memory because that storage option was selected. Vercel does **not** guarantee that requests use the same function instance. State is lost on a cold start and can diverge if the two iPads reach different instances. The instance ID is part of `X-State-Version`, which lets a browser detect an instance change, but it cannot make two separate instances share memory.
+The project requires an Upstash Redis resource connected through the Vercel Marketplace. It reads the credentials supplied by the integration:
 
-This is suitable for experimentation, but it may occasionally fail even with honest players. The smallest reliable upgrade is a free Upstash Redis integration; the browser API can remain unchanged and only `server/state-store.ts` needs replacement.
+- `KV_REST_API_URL`
+- `KV_REST_API_TOKEN`
+
+To provision the same free configuration from a linked project:
+
+```sh
+vercel integration add upstash/upstash-kv \
+  --name browsergame-state \
+  --plan free \
+  --metadata primaryRegion=fra1 \
+  --metadata eviction=true \
+  --metadata autoUpgrade=false
+```
+
+Production, preview, and development use separate Redis keys so local testing cannot replace the production game state.
+If a free-plan eviction ever removes the tiny state key, initialization uses a new high revision rather than reusing an old client version.
 
 ## Run locally
 
@@ -23,6 +39,7 @@ Requires Node.js 20 or newer.
 
 ```sh
 npm install
+vercel env pull .env.local
 npm run dev
 ```
 
@@ -37,10 +54,11 @@ npm run check
 ## Deploy to Vercel
 
 1. Push this directory to a Git repository and import it at [vercel.com/new](https://vercel.com/new), or run `npx vercel` here.
-2. Accept the detected settings. `vercel.json` builds the Vite app into `dist`, and Vercel deploys `api/state.ts` as a function.
-3. Open the deployment URL on both iPads.
+2. Provision and connect Upstash Redis as described above.
+3. Accept the detected settings. `vercel.json` builds the Vite app into `dist`, deploys `api/state.ts` in Frankfurt, and Vercel supplies the Redis credentials.
+4. Open the deployment URL on both iPads.
 
-No environment variables or paid services are required.
+The Upstash free plan is sufficient for light private use and automatic paid-plan upgrades can remain disabled.
 
 ## State API
 
@@ -50,7 +68,7 @@ The state handler is game-agnostic. Its entire state is one JSON object.
 
 ```http
 GET /api/state
-X-State-Version: "instance:revision"
+X-State-Version: "revision"
 ```
 
 Returns the complete state with `X-State-Version`, or `204` with no body when unchanged.
@@ -60,7 +78,7 @@ Returns the complete state with `X-State-Version`, or `204` with no body when un
 ```http
 PATCH /api/state
 Content-Type: application/json
-X-State-Version: "instance:revision"
+X-State-Version: "revision"
 
 {"players":{"one":{"taps":4}},"totalTaps":7}
 ```
