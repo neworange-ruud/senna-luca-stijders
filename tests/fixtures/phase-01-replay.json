@@ -1,0 +1,22 @@
+{
+  "seed": 20260819,
+  "ticks": 360,
+  "inputs": [
+    { "tick": 0, "role": "luca", "horizontal": 1, "jump": false },
+    { "tick": 0, "role": "senna", "horizontal": -1, "jump": false },
+    { "tick": 30, "role": "luca", "horizontal": 1, "jump": true },
+    { "tick": 31, "role": "luca", "horizontal": 1, "jump": false },
+    { "tick": 55, "role": "senna", "horizontal": -1, "jump": true },
+    { "tick": 56, "role": "senna", "horizontal": -1, "jump": false },
+    { "tick": 100, "role": "luca", "horizontal": 0, "jump": false },
+    { "tick": 120, "role": "senna", "horizontal": 1, "jump": false },
+    { "tick": 160, "role": "luca", "horizontal": -1, "jump": false },
+    { "tick": 190, "role": "luca", "horizontal": -1, "jump": true },
+    { "tick": 191, "role": "luca", "horizontal": -1, "jump": false },
+    { "tick": 220, "role": "senna", "horizontal": 0, "jump": false },
+    { "tick": 250, "role": "senna", "horizontal": -1, "jump": false },
+    { "tick": 300, "role": "luca", "horizontal": 1, "jump": false },
+    { "tick": 330, "role": "senna", "horizontal": 1, "jump": true },
+    { "tick": 331, "role": "senna", "horizontal": 1, "jump": false }
+  ]
+}

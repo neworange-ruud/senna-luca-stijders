@@ -1,0 +1,10 @@
+coverage
+dist
+docs
+docs/senna-luca-strijden-intro.svg
+node_modules
+opencode.json
+package-lock.json
+playwright-report
+test-results
+worker-configuration.d.ts

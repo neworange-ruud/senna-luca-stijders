@@ -1,9 +1,14 @@
 node_modules/
 dist/
 .vercel/
+.wrangler/
+coverage/
+playwright-report/
+test-results/
 *.local
 
 .env*
+!.env.example
 .agents/
 .claude/
 skills-lock.json

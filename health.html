@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#10283b" />
+    <title>Technische status | Senna &amp; Luca Strijders</title>
+    <style>
+      :root {
+        color: #f8f4e8;
+        background: #10283b;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        place-items: center;
+      }
+      main {
+        width: min(36rem, calc(100% - 3rem));
+      }
+      h1 {
+        font-size: clamp(2rem, 6vw, 4rem);
+        line-height: 0.95;
+      }
+      ul {
+        display: grid;
+        gap: 0.75rem;
+        padding: 0;
+        list-style: none;
+      }
+      li {
+        display: flex;
+        justify-content: space-between;
+        padding: 1rem;
+        border: 2px solid #78d6c6;
+        border-radius: 0.75rem;
+      }
+      [data-state="ok"] strong {
+        color: #9df06f;
+      }
+      [data-state="error"] strong {
+        color: #ffb38a;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p id="environment">Technische controle</p>
+      <h1>Technische status</h1>
+      <ul>
+        <li id="web" data-state="ok">
+          <span>Webapp</span><strong>Online</strong>
+        </li>
+        <li id="api"><span>Vercel API</span><strong>Controleren...</strong></li>
+        <li id="worker">
+          <span>Realtime Worker</span><strong>Controleren...</strong>
+        </li>
+      </ul>
+    </main>
+    <script type="module" src="/src/health.ts"></script>
+  </body>
+</html>

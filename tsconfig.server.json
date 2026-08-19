@@ -4,5 +4,10 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext"
   },
-  "include": ["api", "server", "src/protocol.ts"]
+  "include": [
+    "api",
+    "server",
+    "tests/integration",
+    "vitest.integration.config.ts"
+  ]
 }

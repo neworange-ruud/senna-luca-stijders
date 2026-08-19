@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "layer": {
+      "type": "http",
+      "url": "https://mcp.app.layer.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer ${LAYER_API_KEY}"
+      }
+    }
+  }
+}

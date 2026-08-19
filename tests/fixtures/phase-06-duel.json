@@ -1,0 +1,95 @@
+{
+  "seed": 20260819,
+  "ticks": 200,
+  "weapons": { "luca": "sword", "senna": "nerf" },
+  "positions": {
+    "luca": { "x": 700, "y": 1104 },
+    "senna": { "x": 844, "y": 1104 }
+  },
+  "inputs": [
+    {
+      "tick": 2,
+      "role": "senna",
+      "horizontal": 0,
+      "jump": false,
+      "attack": true
+    },
+    { "tick": 4, "role": "senna", "horizontal": 0, "jump": false },
+    {
+      "tick": 10,
+      "role": "luca",
+      "horizontal": 0,
+      "jump": false,
+      "attack": true
+    },
+    { "tick": 12, "role": "luca", "horizontal": 0, "jump": false },
+    {
+      "tick": 20,
+      "role": "senna",
+      "horizontal": 0,
+      "jump": false,
+      "block": true
+    },
+    {
+      "tick": 32,
+      "role": "luca",
+      "horizontal": 0,
+      "jump": false,
+      "attack": true
+    },
+    { "tick": 34, "role": "luca", "horizontal": 0, "jump": false },
+    {
+      "tick": 54,
+      "role": "luca",
+      "horizontal": 0,
+      "jump": false,
+      "attack": true
+    },
+    { "tick": 74, "role": "luca", "horizontal": 0, "jump": false },
+    {
+      "tick": 80,
+      "role": "luca",
+      "horizontal": 0,
+      "jump": false,
+      "action": true
+    },
+    { "tick": 84, "role": "luca", "horizontal": 0, "jump": false },
+    {
+      "tick": 90,
+      "role": "luca",
+      "horizontal": 0,
+      "jump": false,
+      "attack": true
+    },
+    { "tick": 92, "role": "luca", "horizontal": 0, "jump": false },
+    {
+      "tick": 100,
+      "role": "senna",
+      "horizontal": 0,
+      "jump": false,
+      "attack": true
+    },
+    { "tick": 102, "role": "senna", "horizontal": 0, "jump": false },
+    {
+      "tick": 120,
+      "role": "luca",
+      "horizontal": 0,
+      "jump": false,
+      "switchWeapon": true
+    },
+    { "tick": 122, "role": "luca", "horizontal": 0, "jump": false },
+    {
+      "tick": 130,
+      "role": "luca",
+      "horizontal": 0,
+      "jump": false,
+      "attack": true
+    },
+    { "tick": 132, "role": "luca", "horizontal": 0, "jump": false },
+    { "tick": 150, "role": "senna", "horizontal": 1, "jump": true },
+    { "tick": 152, "role": "senna", "horizontal": 1, "jump": false },
+    { "tick": 170, "role": "senna", "horizontal": 0, "jump": false },
+    { "tick": 180, "role": "luca", "horizontal": 1, "jump": false },
+    { "tick": 195, "role": "luca", "horizontal": 0, "jump": false }
+  ]
+}

@@ -1,104 +1,254 @@
 <!doctype html>
-<html lang="en">
+<html lang="nl">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#f3c64f" />
-    <title>Tap Relay</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#10283b" />
+    <title>Senna &amp; Luca Strijders</title>
   </head>
   <body>
-    <div class="grain" aria-hidden="true"></div>
     <main class="shell">
       <header class="masthead">
-        <div>
-          <p class="eyebrow">Two screens. One tiny state.</p>
-          <h1>Tap Relay</h1>
-        </div>
-        <div class="connection" data-status="connecting" id="connection">
-          <span class="connection-dot"></span>
-          <span id="connection-label">Connecting</span>
+        <a class="brand" href="/" aria-label="Senna en Luca Strijders">
+          <span>Senna &amp; Luca</span>
+          <strong>Strijders</strong>
+        </a>
+        <div class="connection" id="connection" data-state="loading">
+          <span class="connection-dot" aria-hidden="true"></span>
+          <span id="connection-label">Verbinding controleren...</span>
         </div>
       </header>
 
-      <section class="lobby panel" id="lobby" aria-labelledby="lobby-title">
-        <div class="panel-number">01</div>
-        <div class="panel-content">
-          <p class="section-kicker">Pick a side</p>
-          <h2 id="lobby-title">Who is playing?</h2>
-          <p class="intro">Choose a player, add your name, then open this same address on the other iPad.</p>
-
-          <form id="join-form">
-            <fieldset class="player-choice">
-              <legend class="sr-only">Choose player</legend>
-              <label class="player-card player-card-one">
-                <input type="radio" name="player" value="one" checked />
-                <span class="player-index">1</span>
-                <span>
-                  <strong>Player one</strong>
-                  <small id="player-one-slot">Open spot</small>
-                </span>
-              </label>
-              <label class="player-card player-card-two">
-                <input type="radio" name="player" value="two" />
-                <span class="player-index">2</span>
-                <span>
-                  <strong>Player two</strong>
-                  <small id="player-two-slot">Open spot</small>
-                </span>
-              </label>
-            </fieldset>
-
-            <label class="name-field">
-              <span>Your name</span>
-              <input id="name" name="name" maxlength="24" autocomplete="nickname" placeholder="Type a name" required />
-            </label>
-            <button class="primary-button" type="submit">Join the relay <span aria-hidden="true">→</span></button>
-          </form>
+      <section class="test-panel" id="test-panel" hidden aria-label="Testmodus">
+        <p class="test-badge">Testmodus</p>
+        <div class="test-controls">
+          <label>
+            <span>Jij speelt</span>
+            <select id="test-role">
+              <option value="luca">Luca</option>
+              <option value="senna">Senna</option>
+            </select>
+          </label>
+          <label>
+            <span>Oefenpop</span>
+            <select id="test-behaviour"></select>
+          </label>
+          <label>
+            <span>Wapen</span>
+            <select id="test-weapon">
+              <option value="unarmed">Vuisten</option>
+              <option value="sword">Zwaard</option>
+              <option value="weak-sword">Klein zwaard</option>
+              <option value="nerf">Blaster</option>
+            </select>
+          </label>
+          <button class="secondary-button" id="test-restart" type="button">
+            Opnieuw beginnen
+          </button>
         </div>
+        <p class="test-note">
+          Je speelt alleen tegen een oefenpop. Dit blijft op dit apparaat en
+          verandert niets aan een echte wedstrijd.
+        </p>
       </section>
 
-      <section class="game" id="game" hidden aria-labelledby="game-title">
-        <div class="scoreboard panel">
-          <div class="panel-number">02</div>
-          <div class="panel-content scoreboard-content">
-            <div>
-              <p class="section-kicker">Shared state</p>
-              <h2 id="game-title">Pass the pulse</h2>
+      <section class="hero" id="loading-view" aria-live="polite">
+        <p class="eyebrow">Besloten spel voor twee</p>
+        <h1>Even kijken wie je bent...</h1>
+      </section>
+
+      <section
+        class="setup"
+        id="setup-view"
+        hidden
+        aria-labelledby="setup-title"
+      >
+        <div class="setup-copy">
+          <p class="eyebrow">Instellen door een volwassene</p>
+          <h1 id="setup-title">Koppel dit apparaat</h1>
+          <p>Kies de speler die dit apparaat voortaan gebruikt.</p>
+        </div>
+        <form class="setup-card" id="pair-form">
+          <fieldset>
+            <legend>Wie speelt hier?</legend>
+            <div class="role-grid">
+              <label class="role-card role-luca">
+                <input type="radio" name="role" value="luca" checked />
+                <span class="role-shape" aria-hidden="true">L</span>
+                <strong>Luca</strong>
+              </label>
+              <label class="role-card role-senna">
+                <input type="radio" name="role" value="senna" />
+                <span class="role-shape" aria-hidden="true">S</span>
+                <strong>Senna</strong>
+              </label>
             </div>
-            <div class="total-score">
-              <span id="total-taps">0</span>
-              <small>combined taps</small>
+          </fieldset>
+          <label class="pin-field">
+            <span>Beheerpincode</span>
+            <input
+              id="admin-pin"
+              name="pin"
+              type="password"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              autocomplete="off"
+              minlength="4"
+              maxlength="12"
+              required
+            />
+          </label>
+          <button class="primary-button" type="submit">
+            Dit apparaat koppelen
+          </button>
+          <p class="form-message" id="pair-message" role="alert"></p>
+          <div class="replace-panel" id="replace-panel" hidden>
+            <p>Het oude apparaat wordt direct afgemeld.</p>
+            <button class="danger-button" id="replace-button" type="button">
+              Ja, oud apparaat vervangen
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section
+        class="player-view"
+        id="player-view"
+        hidden
+        aria-labelledby="player-title"
+      >
+        <div class="identity-badge" id="identity-badge" aria-hidden="true">
+          L
+        </div>
+        <div>
+          <p class="eyebrow">Dit apparaat is klaar</p>
+          <h1 id="player-title">Hallo Luca!</h1>
+          <p id="game-status">Wachten op de andere speler...</p>
+        </div>
+        <dl class="status-grid">
+          <div>
+            <dt>Jij</dt>
+            <dd id="own-status">Online</dd>
+          </div>
+          <div>
+            <dt>Andere speler</dt>
+            <dd id="peer-status">Offline</dd>
+          </div>
+          <div>
+            <dt>Spel</dt>
+            <dd id="phase-status">Wachten</dd>
+          </div>
+        </dl>
+        <section class="lobby-panel" id="lobby-panel">
+          <div>
+            <p class="step-label">Stap 1</p>
+            <h2>Kies je uiterlijk</h2>
+            <div class="option-grid cosmetics" id="cosmetic-options"></div>
+          </div>
+          <div>
+            <p class="step-label">Stap 2</p>
+            <h2>Kies de wereld</h2>
+            <p id="chooser-message">Luca kiest deze ronde.</p>
+            <div class="option-grid worlds" id="world-options"></div>
+            <button
+              class="secondary-button"
+              id="confirm-world"
+              type="button"
+              hidden
+            >
+              Deze wereld is goed
+            </button>
+          </div>
+          <div class="ready-row">
+            <div>
+              <p class="step-label">Stap 3</p>
+              <h2>Klaar voor de strijd?</h2>
+            </div>
+            <button
+              class="primary-button ready-button"
+              id="ready-button"
+              type="button"
+            >
+              Ik ben klaar
+            </button>
+          </div>
+        </section>
+        <section
+          class="game-stage"
+          id="game-stage"
+          hidden
+          aria-label="Speelveld"
+        >
+          <div class="game-hud" aria-label="Spelstatus">
+            <div>
+              <strong>Jij</strong>
+              <span class="hearts" id="own-hearts" role="img"
+                >♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥</span
+              >
+            </div>
+            <div>
+              <strong>Tegenstander</strong>
+              <span class="hearts" id="peer-hearts" role="img"
+                >♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥</span
+              >
+            </div>
+            <div class="weapon-slot">
+              <strong>Wapen</strong>
+              <span id="weapon-status">Vuisten</span>
+            </div>
+            <div class="effect-slot">
+              <strong>Krachten</strong>
+              <span id="effect-status">Geen</span>
+            </div>
+            <div class="quality">
+              <strong>Verbinding</strong>
+              <span id="quality-status">Meten...</span>
+            </div>
+            <div>
+              <strong>Zoeken</strong>
+              <span id="opponent-status">Tegenstander zoeken...</span>
+            </div>
+            <div id="protection-status" hidden>Veilig na terugkeer</div>
+            <div class="sound-controls">
+              <button id="effects-toggle" type="button" aria-pressed="false">
+                Geluid aan
+              </button>
+              <button id="music-toggle" type="button" aria-pressed="false">
+                Muziek uit
+              </button>
+            </div>
+            <button id="pause-button" type="button">Pauze</button>
+          </div>
+          <canvas
+            id="game-canvas"
+            aria-label="Arena met Luca en Senna"
+          ></canvas>
+          <div class="touch-controls" aria-label="Spelbesturing">
+            <div class="move-controls">
+              <button type="button" data-control="left" aria-label="Naar links">
+                ←
+              </button>
+              <button
+                type="button"
+                data-control="right"
+                aria-label="Naar rechts"
+              >
+                →
+              </button>
+            </div>
+            <div class="action-controls">
+              <button type="button" data-control="jump">Spring</button>
+              <button type="button" data-control="attack">Aanval</button>
+              <button type="button" data-control="block">Blok</button>
+              <button type="button" data-control="action">Actie</button>
+              <button type="button" data-control="switchWeapon">Wissel</button>
             </div>
           </div>
-        </div>
-
-        <div class="play-grid">
-          <article class="identity-card">
-            <p>You are</p>
-            <h3 id="your-name">Player</h3>
-            <div class="individual-score"><span id="your-taps">0</span> taps</div>
-            <button class="tap-button" id="tap-button" type="button">
-              <span>Tap</span>
-              <small>Send a pulse</small>
-            </button>
-          </article>
-
-          <article class="peer-card">
-            <p>Across the wire</p>
-            <h3 id="peer-name">Waiting for player</h3>
-            <div class="individual-score"><span id="peer-taps">0</span> taps</div>
-            <div class="pulse-track" aria-hidden="true"><span id="pulse"></span></div>
-            <p class="last-action" id="last-action">No taps yet</p>
-          </article>
-        </div>
-
-        <div class="game-actions">
-          <button class="text-button" id="switch-player" type="button">Switch player</button>
-          <button class="text-button" id="reset-game" type="button">Reset scores</button>
-        </div>
+        </section>
       </section>
-
-      <p class="error-message" id="error" role="alert"></p>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

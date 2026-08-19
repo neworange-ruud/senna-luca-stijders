@@ -22,5 +22,7 @@
 - Run the dual-player Playwright suite in headless Chromium and WebKit for final acceptance. Keep traces/screenshots for failures.
 - Never let browser code authoritatively assign damage, items, chest claims, match results, or another player's state.
 - Keep visible game text and errors in simple Dutch. Code, tests, and technical documentation may be English.
-- Use dummy geometric sprites and generated placeholder assets until final graphics are explicitly requested. Do not block gameplay on art.
+- Synthesise sound effects and music in the browser with the Web Audio API. The Layer workspace has no enabled audio model, so audio cannot be generated there; check again before assuming that changed.
+- Generated art and audio are in scope since the 2026-08-19 request. Keep every asset inside the existing bounding-box contract, keep the geometric fallback working when an asset is missing, and never block gameplay on art.
+- Generate game sprites and images through the Layer MCP. Before every generation, estimate the Creative Unit cost and use the cheapest enabled model that supports the required modality, capabilities, and output size. Use a single output and the smallest suitable size for tests; use a more expensive model only when no cheaper compatible model can satisfy the requirement or the user explicitly requests it. Commit raw generations to `assets/source/` and derive runtime files with `npm run assets`.
 - Do not weaken security, reconnect safety, pause behavior, test coverage, or a PRD acceptance criterion to make a checkpoint pass.

@@ -11,5 +11,14 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["api", "server", "src", "tests", "vite.config.ts"]
+  "include": [
+    "src",
+    "scripts",
+    "tests/unit",
+    "tests/helpers",
+    "tests/e2e",
+    "playwright.config.ts",
+    "vite.config.ts",
+    "vitest.unit.config.ts"
+  ]
 }

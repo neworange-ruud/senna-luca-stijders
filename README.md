@@ -1,90 +1,93 @@
-# Browser Multiplayer Foundation
+# Senna & Luca Strijders
 
-A minimal two-player browser game and generic shared-state API designed to deploy together as one Vercel project. The included **Tap Relay** game proves that both browsers can join, write state, resolve simultaneous changes, and observe each other's updates.
+Besloten realtime browsergame voor Luca en Senna. De browserapp draait op Vercel; een Cloudflare Worker met een Durable Object wordt de enige autoriteit voor lobby- en wedstrijdstate. Upstash Redis bewaart in een latere fase uitsluitend apparaatkoppelingen en administratieve state.
 
-## How it works
+De game is in uitvoering. [`docs/PRD.md`](docs/PRD.md) beschrijft het product en [`docs/PLAN.md`](docs/PLAN.md) is de actuele implementatie- en verificatiestatus.
 
-- The static browser app polls `GET /api/state` every 500 ms while its tab is visible.
-- Versioned requests return `204 No Content` with no JSON body when nothing changed.
-- The browser writes an RFC 7396 JSON Merge Patch rather than the complete state. It uses `application/json` so Vercel parses the request body consistently.
-- `X-State-Version` prevents one player from silently overwriting a concurrent move. The client receives the latest state and retries the move up to four times.
-- Upstash Redis holds one shared JSON object and revision for every Vercel function instance.
-- A Redis Lua compare-and-set makes revision checking and state replacement atomic.
-- There is deliberately no authentication, room system, or player ownership enforcement.
+## Architectuur
 
-## Upstash Redis
+```text
+iPad/browser -> Vercel (Vite-app + pairing/session APIs)
+             -> Cloudflare Worker WebSocket
+             -> Durable Object (een autoritatieve game room per omgeving)
 
-The project requires an Upstash Redis resource connected through the Vercel Marketplace. It reads the credentials supplied by the integration:
-
-- `KV_REST_API_URL`
-- `KV_REST_API_TOKEN`
-
-To provision the same free configuration from a linked project:
-
-```sh
-vercel integration add upstash/upstash-kv \
-  --name browsergame-state \
-  --plan free \
-  --metadata primaryRegion=fra1 \
-  --metadata eviction=true \
-  --metadata autoUpgrade=false
+Vercel APIs -> Upstash Redis (apparaatrollen, generaties en rate limits)
 ```
 
-Production, preview, and development use separate Redis keys so local testing cannot replace the production game state.
-If a free-plan eviction ever removes the tiny state key, initialization uses a new high revision rather than reusing an old client version.
+Vercel biedt alleen beveiligde pairing-, sessie- en health-APIs. De Cloudflare Worker en Durable Object zijn de enige autoriteit voor lobby- en wedstrijdstate. Browsercode mag nooit definitief schade, items, kistclaims of een winnaar toekennen.
 
-## Run locally
+## Vereisten
 
-Requires Node.js 20 or newer.
+- Node.js 22
+- npm 10 of nieuwer
+- Voor deployment: afzonderlijke Vercel-, Cloudflare- en Upstash-configuratie voor preview en productie
+
+## Lokaal starten
+
+Installeer dependencies en start de Vite API-adapter plus Wrangler vanuit een terminal:
 
 ```sh
-npm install
-vercel env pull .env.local
+npm ci
 npm run dev
 ```
 
-The Vercel CLI serves Vite and `/api/state` together. Open the printed local URL in two browser windows, select a different player in each, and tap.
+De webapp/API gebruikt standaard `http://localhost:3000`; de lokale Worker gebruikt `http://127.0.0.1:8787`. Wrangler bewaart lokale Durable Object-state onder de genegeerde map `.wrangler/`. De adapter gebruikt dezelfde handlers/contracts als de Vercel Functions en start zonder cloudaccount. Gebruik `npm run dev:vercel` alleen voor provider-pariteit nadat het juiste Vercel-team interactief is gekozen.
 
-Run all checks with:
+`.env.example` bevat uitsluitend veilige lokale placeholders. Maak alleen wanneer nodig een genegeerde `.env.local` en zet echte secrets uitsluitend in de providerinstellingen. De browserbundel mag geen `ADMIN_PIN`, signing secret, Redis-token of intern Worker-secret bevatten.
+
+## Beeld en geluid
+
+Sprites, iconen en werelddecors komen uit de Layer MCP. De ruwe generaties staan in `assets/source/` en worden lokaal omgezet naar de bestanden die het spel laadt:
 
 ```sh
+npm run assets
+```
+
+Dat script haalt de vlakke magenta achtergrond weg, snijdt het iconenblad in losse iconen, schaalt alles en schrijft het resultaat naar `public/art/`. Er zijn geen extra dependencies voor nodig en de stappen zijn gedekt door unittests. Ontbreekt of faalt een afbeelding, dan valt het spel terug op de eenvoudige vormen: de speelbaarheid en de botsingsvakken veranderen nooit mee.
+
+Geluid en muziek worden in de browser zelf gemaakt met de Web Audio API, omdat deze Layer-werkruimte geen audiomodel heeft. Er wordt niets gestart voordat de speler iets aanraakt of indrukt, en geluid en muziek hebben aparte knoppen die hun stand onthouden.
+
+## Testmodus
+
+Voeg `?test=1` toe aan de URL om alleen te spelen zonder een tweede apparaat te koppelen:
+
+```text
+http://localhost:3000/?test=1        # jij bent Luca
+http://localhost:3000/?test=senna    # jij bent Senna
+```
+
+De testmodus draait de volledige wedstrijd lokaal in de browser met dezelfde spelregels als de Durable Object: er wordt geen WebSocket geopend, geen koppeling gebruikt en geen gedeelde state gelezen of geschreven. Een echte wedstrijd kan er dus niet door beinvloed worden.
+
+In het testpaneel kies je de speler, het gedrag van de oefenpop (Stilstaan, Achtervolgen, Wegrennen of Terugvechten), een wapen om te proberen (vuisten, zwaard, klein zwaard of blaster) en start je opnieuw. De testmodus werkt ook op een gedeployde omgeving, bijvoorbeeld om besturing en snelheid op een iPad te proberen.
+
+## Omgevingen
+
+`wrangler.toml` definieert geïsoleerde development-, preview- en production-workers. Deploy nooit zonder eerst de voorbeeld-origins te vervangen en de benodigde secrets met `wrangler secret put` te zetten. Vercel gebruikt dezelfde drie omgevingsnamen en aparte Redis-resources of key prefixes.
+
+Benodigde variabelen staan in `.env.example`:
+
+- `ADMIN_PIN`
+- `SESSION_SIGNING_SECRET`
+- `WORKER_INTERNAL_SECRET`
+- `VITE_REALTIME_URL` (of `REALTIME_URL`; de sessie-API en de pairing-revocatie leiden hier allebei hun endpoint uit af)
+- `KV_REST_API_URL`
+- `KV_REST_API_TOKEN`
+
+## Controleren
+
+```sh
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+npm run test:e2e:webkit
+npm run build
 npm run check
 ```
 
-## Deploy to Vercel
+`npm run check` controleert formatting, lint, unit- en integratietests, alle TypeScript-runtimes en de productiebuild. Browser-E2E staat apart omdat Playwright daarvoor Vite en Wrangler start. Installeer browsers eenmalig met `npx playwright install chromium webkit`.
 
-1. Push this directory to a Git repository and import it at [vercel.com/new](https://vercel.com/new), or run `npx vercel` here.
-2. Provision and connect Upstash Redis as described above.
-3. Accept the detected settings. `vercel.json` builds the Vite app into `dist`, deploys `api/state.ts` in Frankfurt, and Vercel supplies the Redis credentials.
-4. Open the deployment URL on both iPads.
+Coverage voor de pure spelregels wordt geschreven naar `coverage/unit/` via:
 
-The Upstash free plan is sufficient for light private use and automatic paid-plan upgrades can remain disabled.
-
-## State API
-
-The state handler is game-agnostic. Its entire state is one JSON object.
-
-### Read
-
-```http
-GET /api/state
-X-State-Version: "revision"
+```sh
+npm run test:unit:coverage
 ```
-
-Returns the complete state with `X-State-Version`, or `204` with no body when unchanged.
-
-### Update
-
-```http
-PATCH /api/state
-Content-Type: application/json
-X-State-Version: "revision"
-
-{"players":{"one":{"taps":4}},"totalTaps":7}
-```
-
-Returns the updated state and a new `X-State-Version`. A stale version returns `412 Precondition Failed` plus the current state, allowing the browser to retry its change.
-
-JSON Merge Patch uses `null` to remove an object property, so game state must not rely on object properties whose stored value is `null`. Null values inside arrays are unaffected.
-
-To build another game, replace the initial object in `api/state.ts` and the game-specific UI/state mutations in `src/main.ts`. `src/state-client.ts` and the API protocol do not need to change.
