@@ -32,7 +32,7 @@ name = "senna-luca-strijders-production"
 
 [env.production.vars]
 APP_ENV = "production"
-CLIENT_ORIGIN = "https://production.example.invalid"
+CLIENT_ORIGIN = "https://senna-luca-stijders.vercel.app"
 ROOM_ID = "main"
 
 [[env.production.durable_objects.bindings]]

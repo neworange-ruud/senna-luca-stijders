@@ -8,7 +8,7 @@ This is the durable execution record for implementing [`PRD.md`](./PRD.md). It i
 - Overall status: Implementation in progress
 - Current phase: Phase 8 - Pause, reconnect, finish, and rematch
 - Implementation progress: 8 of 11 phases complete
-- Current blocker: None for Phase 8. Exact target iPad models must still be recorded before Phase 10 can pass.
+- Current blocker: None for Phase 8. Two Phase 10 items are open: the Vercel production environment still lacks `ADMIN_PIN`, `SESSION_SIGNING_SECRET`, `WORKER_INTERNAL_SECRET`, and `REALTIME_URL`, so production cannot pair a device; and the exact target iPad models must still be recorded.
 - Next action: Start Phase 8 at immediate global pause and both-ready resume. The schema v4 Worker must be deployed before the matching frontend.
 
 Status values used below:
@@ -109,7 +109,7 @@ These are external facts, not implementation design choices. Record answers here
 | --- | --- | --- |
 | Exact model identifier and iPadOS version for Luca's iPad | Phase 10 physical gate | Develop to Safari 17/iPadOS 17 floor and common iPad landscape viewports. |
 | Exact model identifier and iPadOS version for Senna's iPad | Phase 10 physical gate | Same as above. |
-| Provider/GitHub account authorization and production secrets | Phase 2 remote gate and Phase 10 deployment | Use deterministic local-only secrets until authorization is available. Never store real values in Git. |
+| Provider/GitHub account authorization and production secrets | Phase 2 remote gate and Phase 10 deployment | Preview is fully provisioned. Production has the Worker and its secrets but still needs `ADMIN_PIN`, `SESSION_SIGNING_SECRET`, `WORKER_INTERNAL_SECRET`, and `REALTIME_URL` in Vercel; the matching Worker values are in the ignored `.production-secrets.local`. Never store real values in Git. |
 
 ## Target Code Shape
 
@@ -176,6 +176,7 @@ npm run test:unit
 npm run test:integration
 npm run test:e2e
 npm run test:e2e:webkit
+npm run test:production
 npm run build
 npm run check
 ```
@@ -558,6 +559,10 @@ Append concise entries as work is verified. Do not replace prior evidence.
 | 2026-08-20 | Phase 7 | `npm run test:integration:worker` chest races | Passed: two simultaneous claim packets left exactly one reward and it was in the durable checkpoint; an announced chest and its schedule are committed before a restart could occur | `tests/worker/realtime-worker.test.ts` |
 | 2026-08-20 | Phase 7 | `npm run test:e2e` and `npm run test:e2e:webkit` | Passed: 11 Chromium and 11 WebKit journeys, including one match that delivers all six chest outcomes with Dutch labels and accessible power indicators | `tests/e2e/chests.spec.ts`, `docs/checkpoints/phase-07-chests.png` |
 | 2026-08-20 | Phase 7 | `npm run check` | Passed: 157 unit, 10 Node integration, 10 Worker integration tests, formatting, typed lint, three-runtime type checks, and production build | `docs/checkpoints/phase-07.md` |
+| 2026-08-20 | Deployment | Worker-first deployment of schema v4 | Passed: preview Worker version `e2cacbba-403c-48e4-be58-bc9189a36b90` and production Worker version `6f62fb01-7d3b-4872-82f7-6bd42e95f259` both report protocol 1 / schema 4 | Cloudflare deploy output |
+| 2026-08-20 | Deployment | Vercel production build from `main` | Passed: deployment `senna-luca-stijders-gsj650w9q` Ready, serves the new HUD and the prepared artwork | `npx vercel ls` |
+| 2026-08-20 | Deployment | `npm run test:production` | Passed: 5 Chromium and 5 WebKit checks covering health, Dutch unpaired refusal, retired state surface, no secret in the bundle, artwork delivery, and a full test-mode match on the deployed build | `tests/production/smoke.spec.ts` |
+| 2026-08-20 | Deployment | Production pairing probe | Passed as fail-closed: with `ADMIN_PIN` unset every pin, including an empty one, is rejected with a Dutch 401, so production cannot be paired until it is provisioned | Live `POST /api/pair` |
 
 ## Session Log
 
@@ -583,3 +588,4 @@ Append one row at session start and update its outcome before session end.
 | 2026-08-19 | Phase 6 | Added schema v2 authoritative attack cooldowns; unarmed, sword, and weak-sword melee planning; directional block, cover, protection, simultaneous damage, finish integration, and confirmed persistence before damage broadcasts. | In progress. Focused and full unit/check gates pass. Restart with Worker adversarial melee tests and rendered hit/block events; do not deploy schema v2 until the Phase 6 compatible frontend/Worker slice is ready. |
 | 2026-08-19 | Phase 6 and art | Completed combat: block damage reduction and slowdown, centre-based melee reach, sword charge/throw with retrieval and owner return, Nerf darts with ammo, two weapon slots with switching and drops, immediate finish and winner, pruned authoritative feedback events, adversarial Worker tests, a recorded duel fixture, and a dual-client duel journey. Landed the requested art and audio: Layer MCP sprites, icons, and six world backdrops through a tested local preparation pipeline, plus synthesised sound with independent mutes. | Complete and verified. `npm run check`, Chromium and WebKit E2E all pass. Restart at Phase 7's first unchecked task; inspect `docs/checkpoints/phase-06.md`. |
 | 2026-08-20 | Phase 7 | Implemented announced chests, the seeded shuffle bag, Action claims with deterministic tie resolution, all six outcomes, armor/camouflage/speed effects with HUD and opponent-visible indicators, and the eligible-recovery counter. | Complete and verified. `npm run check`, 11 Chromium and 11 WebKit journeys pass. Restart at Phase 8's first unchecked task; inspect `docs/checkpoints/phase-07.md`. |
+| 2026-08-20 | Deployment | Deployed the schema v4 Worker to preview and production, pushed the frontend, added a read-only production smoke suite, and audited the deployed environment. | Complete for everything that does not need production credentials. Production Vercel still needs its four environment variables before a device can be paired; the Worker side is already provisioned. |

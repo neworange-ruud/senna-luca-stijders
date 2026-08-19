@@ -26,7 +26,8 @@
     "test:soak": "cross-env REALTIME_SAMPLES=6400 REALTIME_INTERVAL_MS=33 playwright test tests/e2e/realtime.spec.ts --project=chromium",
     "simulation:replay": "tsx scripts/replay-simulation.ts",
     "check": "npm run format:check && npm run lint && npm run test && npm run build",
-    "assets": "tsx scripts/prepare-assets.ts"
+    "assets": "tsx scripts/prepare-assets.ts",
+    "test:production": "playwright test --config playwright.production.config.ts"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",

@@ -73,6 +73,33 @@ Benodigde variabelen staan in `.env.example`:
 - `KV_REST_API_URL`
 - `KV_REST_API_TOKEN`
 
+## Deployen
+
+Deploy altijd eerst de Worker en daarna de frontend, zodat een nieuwe spelversie nooit tegen een oudere server praat:
+
+```sh
+npx wrangler deploy --env preview      # of --env production
+git push                               # Vercel bouwt automatisch
+```
+
+Een omgeving werkt pas volledig als deze variabelen in Vercel staan (naast de Upstash-variabelen die de integratie zelf zet):
+
+- `ADMIN_PIN` - de pincode waarmee een volwassene een apparaat koppelt
+- `SESSION_SIGNING_SECRET` - moet exact gelijk zijn aan het secret van de Worker
+- `WORKER_INTERNAL_SECRET` - idem, voor het afmelden van een vervangen apparaat
+- `REALTIME_URL` - de `wss://`-URL van de Worker van diezelfde omgeving
+
+Ontbreekt `ADMIN_PIN`, dan weigert de koppelpagina elke pincode. Dat is veilig: niemand kan koppelen, maar spelen kan dan ook niet.
+
+Controleer een gedeployde omgeving met:
+
+```sh
+npm run test:production
+PRODUCTION_URL=https://... npm run test:production
+```
+
+Deze controle koppelt geen apparaat en raakt geen lopende wedstrijd aan.
+
 ## Controleren
 
 ```sh

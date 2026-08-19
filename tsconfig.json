@@ -17,7 +17,9 @@
     "tests/unit",
     "tests/helpers",
     "tests/e2e",
+    "tests/production",
     "playwright.config.ts",
+    "playwright.production.config.ts",
     "vite.config.ts",
     "vitest.unit.config.ts"
   ]
