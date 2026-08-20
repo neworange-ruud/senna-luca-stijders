@@ -1,5 +1,10 @@
 import { BEACH_ARENA } from "../src/game/arenas/beach.js";
 import { applyGameCommand } from "../src/game/commands.js";
+import {
+  applyConnectionHealth,
+  everyoneCanAct,
+  watchesHeartbeats,
+} from "../src/game/connection.js";
 import { acceptCommand, type SequenceState } from "../src/game/determinism.js";
 import { selectChestPoint } from "../src/game/chests.js";
 import { CHESTS } from "../src/game/config.js";
@@ -65,6 +70,12 @@ const MAX_PROCESSED_COMMAND_IDS = 512;
 const SNAPSHOT_INTERVAL_TICKS = 2;
 const PERSIST_INTERVAL_TICKS = 6;
 const ACTIVE_PHASES = new Set(["countdown", "playing"]);
+/**
+ * Only held controls are withdrawn while a heartbeat is late. Asking to pause,
+ * to be ready, or for a rematch can never gain an advantage, and refusing a
+ * pause from a child on a bad connection would just lose the request.
+ */
+const WITHDRAWN_WHILE_STALE = new Set(["input"]);
 
 const DUTCH_ERRORS: Record<GameError["code"], string> = {
   INVALID_MESSAGE: "Dit spelbericht klopt niet.",
@@ -241,6 +252,8 @@ export class GameRoom {
   private timer: number | null = null;
   private snapshotRevision = 0;
   private generations: Record<PlayerRole, number> = { luca: 0, senna: 0 };
+  /** Wall-clock time each role last sent anything, for heartbeat staleness. */
+  private lastHeardAt: Record<PlayerRole, number> = { luca: 0, senna: 0 };
   private readonly rateWindows = new Map<WebSocket, RateWindow>();
 
   constructor(
@@ -249,19 +262,35 @@ export class GameRoom {
   ) {
     this.ready = this.ctx.blockConcurrencyWhile(async () => {
       const persisted = await this.ctx.storage.get<PersistedRoom>("checkpoint");
-      if (persisted?.schemaVersion === GAME_SCHEMA_VERSION) {
-        this.state = persisted.state;
-        this.generations = persisted.generations ?? { luca: 0, senna: 0 };
-        if (
-          ["countdown", "playing", "paused"].includes(this.state.match.phase)
-        ) {
-          this.state.match.phase = "reconnecting";
-          this.state.match.resumeTarget = "playing";
-        }
-        for (const player of Object.values(this.state.match.players)) {
-          player.connected = false;
-          player.ready = false;
-        }
+      if (!persisted) return;
+      // Credential generations outlive the game rules. Keeping them across an
+      // incompatible deployment means a replaced device stays replaced even
+      // when the match itself has to be discarded.
+      this.generations = persisted.generations ?? { luca: 0, senna: 0 };
+      if (persisted.schemaVersion !== GAME_SCHEMA_VERSION) {
+        // A match from another schema cannot be reasoned about safely, so it is
+        // dropped rather than partly loaded. Deploying the Worker first means
+        // this only ever discards a match that was already mid-upgrade.
+        // Auditable in the Cloudflare log, with no player data in it.
+        console.log(
+          JSON.stringify({
+            event: "checkpoint_drained",
+            omgeving: this.env.APP_ENV,
+            from: persisted.schemaVersion,
+            to: GAME_SCHEMA_VERSION,
+          }),
+        );
+        await this.persist();
+        return;
+      }
+      this.state = persisted.state;
+      if (["countdown", "playing", "paused"].includes(this.state.match.phase)) {
+        this.state.match.phase = "reconnecting";
+        this.state.match.resumeTarget = "playing";
+      }
+      for (const player of Object.values(this.state.match.players)) {
+        player.connected = false;
+        player.ready = false;
       }
     });
   }
@@ -297,6 +326,9 @@ export class GameRoom {
       this.state = createInitialGameState(20_260_819);
       this.snapshotRevision = 0;
       this.generations = { luca: 0, senna: 0 };
+      // The heartbeat clock belongs to the old room; a fresh room must not
+      // start out looking like a connection that has been quiet for minutes.
+      this.lastHeardAt = { luca: 0, senna: 0 };
       this.rateWindows.clear();
       await this.ctx.storage.deleteAll();
       await this.persist();
@@ -310,6 +342,8 @@ export class GameRoom {
       this.state.match.players.senna.cosmetic = "pirate";
       this.state.match.arenaId = "beach";
       this.state.match.phase = "playing";
+      const startedAt = Date.now();
+      this.lastHeardAt = { luca: startedAt, senna: startedAt };
       initializeArena(this.state, BEACH_ARENA);
       this.broadcast(this.snapshotMessage());
       this.ensureSimulationLoop();
@@ -380,6 +414,12 @@ export class GameRoom {
         };
         player.facing = target === "luca" ? "right" : "left";
       }
+      const health = Number(query.get("health"));
+      if (Number.isInteger(health) && health >= 1 && health <= 10) {
+        // Lets a journey reach the last heart without grinding out nine hits.
+        // The killing blow itself still has to be a real authoritative attack.
+        player.health = health;
+      }
       await this.persist();
       this.broadcast(this.snapshotMessage());
       return json({ status: "ok", role: target, item: itemId });
@@ -413,6 +453,7 @@ export class GameRoom {
     server.serializeAttachment({ role, generation } satisfies SocketAttachment);
     this.ctx.acceptWebSocket(server);
     setPlayerConnected(this.state, role, true);
+    this.lastHeardAt[role] = Date.now();
     await this.persist();
 
     server.send(
@@ -440,6 +481,16 @@ export class GameRoom {
     message: string | ArrayBuffer,
   ): Promise<void> {
     await this.ready;
+    // Anything at all on a role's socket proves that connection is answering,
+    // so it counts as that role's heartbeat: a command, or just a ping.
+    const speaker = (socket.deserializeAttachment() as SocketAttachment | null)
+      ?.role;
+    if (speaker) {
+      this.lastHeardAt[speaker] = Date.now();
+      if (!this.state.match.players[speaker].connected) {
+        setPlayerConnected(this.state, speaker, true);
+      }
+    }
     if (typeof message !== "string" || message.length > MAX_MESSAGE_BYTES) {
       this.sendError(socket, {
         code: "INVALID_MESSAGE",
@@ -511,6 +562,17 @@ export class GameRoom {
       return;
     }
 
+    if (
+      WITHDRAWN_WHILE_STALE.has(command.type) &&
+      !everyoneCanAct(this.silenceMilliseconds())
+    ) {
+      this.sendAcknowledgement(socket, command, {
+        code: "INVALID_PHASE",
+        messageKey: "fout.verbindingHapert",
+      });
+      return;
+    }
+
     const sequenceState: SequenceState = {
       lastByRole: {
         luca: this.state.match.players.luca.lastProcessedSequence,
@@ -551,17 +613,29 @@ export class GameRoom {
           return candidateAttachment?.role === attachment.role;
         })
       : false;
-    if (attachment && !replacementIsOpen) {
+    const left = Boolean(attachment) && !replacementIsOpen;
+    if (attachment && left) {
       setPlayerConnected(this.state, attachment.role, false);
     }
     await this.persist();
+    if (left) {
+      // The player who stayed has to see that the match is frozen; presence
+      // alone does not carry the new phase.
+      this.broadcast(this.snapshotMessage());
+    }
     this.broadcastPresence();
     this.stopSimulationLoopIfIdle();
   }
 
+  /** The room keeps ticking while it simulates or while it watches heartbeats. */
+  private needsLoop(): boolean {
+    return (
+      ACTIVE_PHASES.has(this.state.match.phase) || watchesHeartbeats(this.state)
+    );
+  }
+
   private ensureSimulationLoop(): void {
-    if (this.timer !== null || !ACTIVE_PHASES.has(this.state.match.phase))
-      return;
+    if (this.timer !== null || !this.needsLoop()) return;
     this.timer = setTimeout(
       () => void this.runSimulationLoop(),
       1_000 / 30,
@@ -569,10 +643,18 @@ export class GameRoom {
   }
 
   private stopSimulationLoopIfIdle(): void {
-    if (this.timer === null || ACTIVE_PHASES.has(this.state.match.phase))
-      return;
+    if (this.timer === null || this.needsLoop()) return;
     clearTimeout(this.timer);
     this.timer = null;
+  }
+
+  /** How long each role has been silent, from the room's own clock. */
+  private silenceMilliseconds(): Record<PlayerRole, number> {
+    const now = Date.now();
+    return {
+      luca: this.lastHeardAt.luca === 0 ? 0 : now - this.lastHeardAt.luca,
+      senna: this.lastHeardAt.senna === 0 ? 0 : now - this.lastHeardAt.senna,
+    };
   }
 
   private async runSimulationLoop(): Promise<void> {
@@ -587,6 +669,23 @@ export class GameRoom {
   private async tick(): Promise<void> {
     await this.ready;
     let confirmed = false;
+    // A quiet heartbeat freezes the whole match before anything else runs, so
+    // no tick is simulated while one side cannot answer.
+    const health = applyConnectionHealth(
+      this.state,
+      this.silenceMilliseconds(),
+    );
+    if (health.changed) {
+      await this.persist();
+      this.broadcast(this.snapshotMessage());
+      this.broadcastPresence();
+    }
+    if (!ACTIVE_PHASES.has(this.state.match.phase)) {
+      // Frozen by a connection: keep watching the heartbeats, simulate nothing.
+      this.stopSimulationLoopIfIdle();
+      return;
+    }
+    const phaseBeforeTick = this.state.match.phase;
     if (this.state.match.phase === "countdown") {
       const priorPhase = this.state.match.phase;
       advanceLifecycle(this.state, this.state.match.tick + 1);
@@ -594,6 +693,10 @@ export class GameRoom {
         priorPhase !== this.state.match.phase &&
         this.state.match.phase === "playing"
       ) {
+        // Play starts now, so the heartbeat clock starts now too. Otherwise a
+        // long quiet lobby would look like a failing connection on tick one.
+        const now = Date.now();
+        this.lastHeardAt = { luca: now, senna: now };
         initializeArena(this.state, BEACH_ARENA);
         await this.persist();
         confirmed = true;
@@ -613,7 +716,13 @@ export class GameRoom {
     ) {
       await this.persist();
     }
-    if (this.state.match.tick % SNAPSHOT_INTERVAL_TICKS === 0) {
+    // A phase change never waits for the snapshot cadence. The tick that ends a
+    // match is also the last tick the room simulates, so a snapshot skipped
+    // here is never sent at all and both players keep staring at a match that
+    // is already over.
+    const phaseChanged = phaseBeforeTick !== this.state.match.phase;
+    if (phaseChanged && !confirmed) await this.persist();
+    if (phaseChanged || this.state.match.tick % SNAPSHOT_INTERVAL_TICKS === 0) {
       this.broadcast(this.snapshotMessage());
     }
     this.stopSimulationLoopIfIdle();

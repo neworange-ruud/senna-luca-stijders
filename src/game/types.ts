@@ -1,4 +1,4 @@
-export const GAME_SCHEMA_VERSION = 4 as const;
+export const GAME_SCHEMA_VERSION = 6 as const;
 export const GAME_PROTOCOL_VERSION = 1 as const;
 
 export type PlayerRole = "luca" | "senna";
@@ -162,6 +162,13 @@ export interface PlayerState {
   nextAttackTick: number;
   /** Ticks the attack control has been held, used for the sword throw charge. */
   attackHeldTicks: number;
+  /**
+   * Set when the attack control was pressed since the last simulated tick. A
+   * quick tap can start and end inside one tick, and losing it would make the
+   * game feel broken on a touchscreen, so the press is remembered until a tick
+   * consumes it.
+   */
+  attackQueued: boolean;
   /** -1 selects unarmed combat, otherwise the index of an inventory slot. */
   selectedSlot: number;
   lastProcessedSequence: number;
@@ -198,6 +205,11 @@ export interface MatchState {
   countdownEndsTick: number | null;
   resumeTarget: "playing" | null;
   pausedBy: PlayerRole | null;
+  /**
+   * Why the match is paused. A player asked for it, or a connection went quiet;
+   * the browser explains the two differently.
+   */
+  pauseReason: "player" | "connection" | null;
   winner: PlayerRole | null;
   arenaId: WorldId | null;
   randomState: number;
@@ -263,6 +275,13 @@ export interface ConfirmWorldCommand {
   sequence: number;
 }
 
+export interface RematchCommand {
+  type: "rematch";
+  id: string;
+  role: PlayerRole;
+  sequence: number;
+}
+
 export interface SelectCosmeticCommand {
   type: "select-cosmetic";
   id: string;
@@ -275,6 +294,7 @@ export type GameCommand =
   | InputCommand
   | ReadyCommand
   | PauseCommand
+  | RematchCommand
   | SelectWorldCommand
   | ConfirmWorldCommand
   | SelectCosmeticCommand;
@@ -359,6 +379,9 @@ export function parseGameCommand(value: unknown): GameCommand | GameError {
   }
   if (command.type === "pause") {
     return command as PauseCommand;
+  }
+  if (command.type === "rematch") {
+    return command as RematchCommand;
   }
   if (command.type === "select-world" && isWorldId(command.world)) {
     return command as SelectWorldCommand;

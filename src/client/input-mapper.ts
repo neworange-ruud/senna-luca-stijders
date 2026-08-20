@@ -24,8 +24,9 @@ export class InputMapper {
     return this.intent;
   }
 
-  release(sourceId: string): InputIntent {
-    this.active.delete(sourceId);
+  /** Returns null when this source was not holding anything down. */
+  release(sourceId: string): InputIntent | null {
+    if (!this.active.delete(sourceId)) return null;
     return this.intent;
   }
 

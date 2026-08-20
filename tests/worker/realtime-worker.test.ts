@@ -19,12 +19,16 @@ interface ProtocolMessage {
 interface RoomState {
   match: {
     phase: string;
+    tick: number;
     chests: { position: { x: number; y: number } }[];
     chestSchedule: { nextAnnouncementTick: number };
     players: Record<
       "luca" | "senna",
       {
         health: number;
+        attackQueued: boolean;
+        nextAttackTick: number;
+        input: { attack: boolean };
         facing: "left" | "right";
         position: { x: number; y: number };
         inventory: unknown[];
@@ -43,6 +47,36 @@ const IDLE_INTENT = {
 } as const;
 
 afterEach(async () => reset());
+
+/**
+ * Real clients resend their held controls every 250 ms, and the room freezes the
+ * match when that stops. Tests that wait for a simulated outcome have to keep
+ * that heartbeat going, so this pumps one intent per role until it is stopped.
+ */
+function startHeartbeat(
+  sockets: readonly (readonly [WebSocket, "luca" | "senna"])[],
+  intent: Record<string, unknown>,
+): () => void {
+  let sequence = 100;
+  const timer = setInterval(() => {
+    for (const [socket, role] of sockets) {
+      sequence += 1;
+      socket.send(
+        JSON.stringify({
+          type: "command",
+          command: {
+            type: "input",
+            id: `beat-${role}-${sequence}`,
+            role,
+            sequence,
+            intent,
+          },
+        }),
+      );
+    }
+  }, 200);
+  return () => clearInterval(timer);
+}
 
 function nextMessage(
   socket: WebSocket,
@@ -87,7 +121,7 @@ describe("realtime Worker", () => {
     await expect(response.json()).resolves.toMatchObject({
       status: "ok",
       protocolVersion: 1,
-      schemaVersion: 4,
+      schemaVersion: 6,
     });
   });
 
@@ -152,7 +186,7 @@ describe("realtime Worker", () => {
         state.storage.get("checkpoint"),
     );
     expect(checkpoint).toMatchObject({
-      schemaVersion: 4,
+      schemaVersion: 6,
       state: { lobby: { selectedWorld: "beach" } },
     });
     await evictDurableObject(stub, { webSockets: "close" });
@@ -366,23 +400,13 @@ describe("realtime Worker", () => {
         }
       });
 
-      for (const [socket, role] of [
-        [luca, "luca"],
-        [senna, "senna"],
-      ] as const) {
-        socket.send(
-          JSON.stringify({
-            type: "command",
-            command: {
-              type: "input",
-              id: `claim-${role}`,
-              role,
-              sequence: 1,
-              intent: { ...IDLE_INTENT, action: true },
-            },
-          }),
-        );
-      }
+      const stopHeartbeat = startHeartbeat(
+        [
+          [luca, "luca"],
+          [senna, "senna"],
+        ],
+        { ...IDLE_INTENT, action: true },
+      );
       // The chest still has to land before either claim can count, and the
       // simulation runs on its own clock, so wait for the outcome instead of
       // guessing how long that takes.
@@ -422,10 +446,60 @@ describe("realtime Worker", () => {
         1,
       );
 
+      stopHeartbeat();
       luca.close();
       senna.close();
     },
   );
+
+  it("tells both players about a match that ends between two snapshots", async () => {
+    const bindings = env as unknown as { GAME_ROOMS: DurableObjectNamespace };
+    const stub = bindings.GAME_ROOMS.getByName("development:main");
+    const luca = await connect("luca");
+    const senna = await connect("senna");
+    await stub.fetch("https://room.internal/debug/start-playing", {
+      method: "POST",
+    });
+
+    const finishedForLuca = nextMessage(
+      luca,
+      (message) => message.snapshot?.state.match.phase === "finished",
+    );
+    const finishedForSenna = nextMessage(
+      senna,
+      (message) => message.snapshot?.state.match.phase === "finished",
+    );
+
+    // Arrange the killing blow so that it lands on an odd tick, which is
+    // exactly the tick the snapshot cadence skips. The room stops simulating
+    // right after it, so that snapshot is the only chance to tell anyone.
+    await runInDurableObject(stub, (instance: GameRoom) => {
+      const room = instance as unknown as { state: RoomState };
+      const match = room.state.match;
+      match.tick = 200;
+      match.players.luca.position = { x: 300, y: 1_104 };
+      match.players.senna.position = { x: 380, y: 1_104 };
+      match.players.luca.facing = "right";
+      match.players.senna.facing = "left";
+      match.players.luca.nextAttackTick = 0;
+      match.players.luca.input.attack = false;
+      match.players.luca.attackQueued = true;
+      match.players.senna.health = 1;
+    });
+
+    const seen = await Promise.all([finishedForLuca, finishedForSenna]);
+    for (const message of seen) {
+      expect(message.snapshot?.state.match.phase).toBe("finished");
+    }
+    const ending = await runInDurableObject(stub, (instance: GameRoom) => {
+      const room = instance as unknown as { state: RoomState };
+      return room.state.match.tick;
+    });
+    expect(ending % 2).toBe(1);
+
+    luca.close();
+    senna.close();
+  });
 
   it("commits an announced chest and its schedule before a restart could happen", async () => {
     const bindings = env as unknown as { GAME_ROOMS: DurableObjectNamespace };
@@ -455,6 +529,51 @@ describe("realtime Worker", () => {
     ).toBeGreaterThan(0);
     luca.close();
     senna.close();
+  });
+
+  it("drains a checkpoint from another schema but keeps its generations", async () => {
+    const bindings = env as unknown as { GAME_ROOMS: DurableObjectNamespace };
+    const stub = bindings.GAME_ROOMS.getByName("development:main");
+    // Write a checkpoint that looks like an older deployment left it behind.
+    await runInDurableObject(
+      stub,
+      async (_instance: GameRoom, state: DurableObjectState) =>
+        state.storage.put("checkpoint", {
+          schemaVersion: 1,
+          generations: { luca: 4, senna: 2 },
+          state: { nonsense: true },
+        }),
+    );
+    await evictDurableObject(stub, { webSockets: "close" });
+
+    // The match starts clean instead of loading a state it cannot reason about.
+    const restored = await runInDurableObject(stub, (instance: GameRoom) => {
+      const room = instance as unknown as { state: RoomState };
+      return {
+        phase: room.state.match.phase,
+        chests: room.state.match.chests.length,
+      };
+    });
+    expect(restored).toEqual({ phase: "waiting", chests: 0 });
+
+    // A replaced device stays replaced across the incompatible deployment, and
+    // the current generation still gets in.
+    const stale = await runInDurableObject(stub, async (instance: GameRoom) =>
+      instance.fetch(
+        new Request("https://room.internal/ws?role=luca", {
+          headers: { "x-role-generation": "3" },
+        }),
+      ),
+    );
+    expect(stale.status).toBe(403);
+
+    // The drained checkpoint was rewritten at the current schema.
+    const rewritten = await runInDurableObject(
+      stub,
+      async (_instance: GameRoom, state: DurableObjectState) =>
+        state.storage.get<{ schemaVersion: number }>("checkpoint"),
+    );
+    expect(rewritten?.schemaVersion).toBe(6);
   });
 
   it("persists revocation generations and rejects stale role tokens", async () => {

@@ -70,7 +70,9 @@ test("two clients exchange authoritative movement within the local latency budge
                 JSON.stringify({ type: "ping", clientTime: performance.now() }),
               );
             }
-          }, 1_000);
+            // Matches the real client: the room treats a quiet socket as a
+            // failing connection after 750 ms.
+          }, 250);
         }
 
         static async connect(role: "luca" | "senna"): Promise<Peer> {

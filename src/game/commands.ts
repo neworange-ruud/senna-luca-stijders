@@ -2,6 +2,7 @@ import { setInputIntent } from "./simulation.js";
 import {
   confirmWorld,
   pauseMatch,
+  requestRematch,
   selectCosmetic,
   selectWorld,
   setPlayerReady,
@@ -28,6 +29,8 @@ export function applyGameCommand(
       return setPlayerReady(state, command.role, command.ready);
     case "pause":
       return pauseMatch(state, command.role);
+    case "rematch":
+      return requestRematch(state, command.role);
     case "select-world":
       return selectWorld(state, command.role, command.world);
     case "confirm-world":

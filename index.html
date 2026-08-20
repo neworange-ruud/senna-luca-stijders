@@ -226,6 +226,29 @@
             id="game-canvas"
             aria-label="Arena met Luca en Senna"
           ></canvas>
+          <div
+            class="stage-overlay"
+            id="stage-overlay"
+            role="alertdialog"
+            aria-labelledby="overlay-title"
+            hidden
+          >
+            <div class="overlay-card">
+              <p class="overlay-eyebrow" id="overlay-eyebrow">Pauze</p>
+              <h2 id="overlay-title">Even wachten</h2>
+              <p id="overlay-message"></p>
+              <div class="overlay-actions">
+                <button
+                  class="primary-button"
+                  id="overlay-action"
+                  type="button"
+                >
+                  Doorgaan
+                </button>
+                <p class="overlay-status" id="overlay-status"></p>
+              </div>
+            </div>
+          </div>
           <div class="touch-controls" aria-label="Spelbesturing">
             <div class="move-controls">
               <button type="button" data-control="left" aria-label="Naar links">

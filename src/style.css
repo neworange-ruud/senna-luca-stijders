@@ -361,7 +361,10 @@ legend,
   box-shadow: 8px 8px 0 #10283b;
   touch-action: none;
 }
-.player-view[data-phase="playing"] {
+.player-view[data-phase="playing"],
+.player-view[data-phase="paused"],
+.player-view[data-phase="reconnecting"],
+.player-view[data-phase="finished"] {
   position: fixed;
   z-index: 5;
   inset: 0;
@@ -373,11 +376,20 @@ legend,
     max(0.5rem, env(safe-area-inset-left));
   background: #89d5e8;
 }
-.player-view[data-phase="playing"] > :not(.game-stage) {
+.player-view[data-phase="playing"] > :not(.game-stage),
+.player-view[data-phase="paused"] > :not(.game-stage),
+.player-view[data-phase="reconnecting"] > :not(.game-stage),
+.player-view[data-phase="finished"] > :not(.game-stage) {
   display: none;
 }
 .player-view[data-phase="playing"] .game-stage,
-.player-view[data-phase="playing"] #game-canvas {
+.player-view[data-phase="playing"] #game-canvas,
+.player-view[data-phase="paused"] .game-stage,
+.player-view[data-phase="paused"] #game-canvas,
+.player-view[data-phase="reconnecting"] .game-stage,
+.player-view[data-phase="reconnecting"] #game-canvas,
+.player-view[data-phase="finished"] .game-stage,
+.player-view[data-phase="finished"] #game-canvas {
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -488,6 +500,48 @@ legend,
   background: #f5bd34;
   color: #10283b;
   font-weight: 950;
+}
+.stage-overlay {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: #10283bcc;
+}
+.overlay-card {
+  width: min(30rem, 100%);
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border: 4px solid #10283b;
+  border-radius: 1.25rem;
+  background: #fffaf0;
+  box-shadow: 8px 8px 0 #10283b;
+  text-align: center;
+}
+.overlay-eyebrow {
+  margin: 0;
+  color: #b34832;
+  font-size: 0.75rem;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.overlay-card h2 {
+  margin: 0.35rem 0 0.5rem;
+  font-size: clamp(1.6rem, 5vw, 2.6rem);
+  line-height: 1;
+}
+.overlay-card p {
+  margin: 0;
+}
+.overlay-actions {
+  margin-top: 1.25rem;
+}
+.overlay-status {
+  min-height: 1.5rem;
+  margin-top: 0.5rem;
+  font-weight: 800;
 }
 .touch-controls {
   position: absolute;
@@ -607,7 +661,9 @@ legend,
   min-height: 2.75rem;
   margin-top: 0;
 }
-body[data-test-mode="aan"] .player-view[data-phase="playing"] {
+body[data-test-mode="aan"] .player-view[data-phase="playing"],
+body[data-test-mode="aan"] .player-view[data-phase="paused"],
+body[data-test-mode="aan"] .player-view[data-phase="finished"] {
   padding-top: 7rem;
 }
 .test-badge {

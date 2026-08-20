@@ -48,6 +48,8 @@ export function setInputIntent(
 ): void {
   const player = state.match.players[role];
   const wasSwitching = player.input.switchWeapon;
+  // Remember a press even if it is released again before the next tick.
+  if (intent.attack && !player.input.attack) player.attackQueued = true;
   player.input = { ...intent };
   if (intent.switchWeapon && !wasSwitching && state.match.phase === "playing") {
     switchWeapon(player);

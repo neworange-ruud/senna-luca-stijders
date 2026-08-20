@@ -29,6 +29,7 @@ function player(role: PlayerRole): PlayerState {
     invulnerableUntilTick: 0,
     nextAttackTick: 0,
     attackHeldTicks: 0,
+    attackQueued: false,
     selectedSlot: UNARMED_SLOT,
     lastProcessedSequence: 0,
     input: { ...EMPTY_INPUT },
@@ -53,6 +54,7 @@ export function createInitialGameState(randomSeed = 1): GameState {
       countdownEndsTick: null,
       resumeTarget: null,
       pausedBy: null,
+      pauseReason: null,
       winner: null,
       arenaId: null,
       randomState: randomSeed >>> 0,
@@ -199,6 +201,8 @@ export function advanceLifecycle(state: GameState, tick: number): void {
     setPhase(state, state.match.resumeTarget ?? "playing");
     state.match.countdownEndsTick = null;
     state.match.resumeTarget = null;
+    state.match.pausedBy = null;
+    state.match.pauseReason = null;
     for (const playerState of Object.values(state.match.players)) {
       playerState.ready = false;
     }
@@ -211,6 +215,7 @@ export function pauseMatch(
 ): GameError | null {
   if (state.match.phase !== "playing") return invalidPhase();
   state.match.pausedBy = role;
+  state.match.pauseReason = "player";
   state.match.resumeTarget = "playing";
   for (const playerState of Object.values(state.match.players)) {
     playerState.ready = false;
@@ -263,6 +268,7 @@ export function requestRematch(
   state.match.arenaId = null;
   state.match.winner = null;
   state.match.pausedBy = null;
+  state.match.pauseReason = null;
   state.match.resumeTarget = null;
   state.match.countdownEndsTick = null;
   state.match.entities = [];

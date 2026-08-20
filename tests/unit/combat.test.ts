@@ -3,7 +3,10 @@ import { BEACH_ARENA } from "../../src/game/arenas/beach";
 import { simulateCombat, simulateProjectiles } from "../../src/game/combat";
 import { COMBAT, MELEE, NERF, TICK_SECONDS } from "../../src/game/config";
 import { createItem, giveItem } from "../../src/game/items";
-import { simulateMovementTick } from "../../src/game/simulation";
+import {
+  setInputIntent,
+  simulateMovementTick,
+} from "../../src/game/simulation";
 import { createInitialGameState } from "../../src/game/state-machine";
 import {
   EMPTY_INPUT,
@@ -78,6 +81,21 @@ describe("melee", () => {
     state.match.players.luca.facing = "left";
     expect(attackTick(state, 10)).toMatchObject([{ outcome: "miss" }]);
     expect(state.match.players.senna.health).toBe(10);
+  });
+
+  it("does not lose a tap that starts and ends between two ticks", () => {
+    const state = duel();
+    // Start from a released control, as a real client would.
+    state.match.players.luca.input = { ...EMPTY_INPUT };
+    // A fast tap on a touchscreen can be pressed and released inside one tick,
+    // so the press is remembered instead of thrown away.
+    setInputIntent(state, "luca", { ...EMPTY_INPUT, attack: true });
+    setInputIntent(state, "luca", { ...EMPTY_INPUT });
+    expect(attackTick(state, 10)).toMatchObject([
+      { kind: "melee", outcome: "hit", damage: 1 },
+    ]);
+    // The remembered press is consumed once and never repeats.
+    expect(attackTick(state, 40)).toEqual([]);
   });
 
   it("still reaches an opponent who is standing on top of the attacker", () => {

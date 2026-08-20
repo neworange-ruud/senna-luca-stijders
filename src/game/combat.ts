@@ -176,6 +176,9 @@ function planAttack(
 ): PlannedAttack | null {
   const held = attacker.attackHeldTicks;
   const pressed = attacker.input.attack;
+  // A tap that came and went between two ticks still counts once.
+  const queued = attacker.attackQueued;
+  attacker.attackQueued = false;
   attacker.attackHeldTicks = pressed ? held + 1 : 0;
 
   const weapon = selectedWeapon(attacker);
@@ -192,7 +195,8 @@ function planAttack(
       projectile: spawnProjectile(state, attacker, thrown.itemId, null),
     };
   }
-  if (!pressed || held > 0 || tick < attacker.nextAttackTick) return null;
+  const swings = (pressed && held === 0) || (!pressed && queued);
+  if (!swings || tick < attacker.nextAttackTick) return null;
 
   if (weapon === "nerf") {
     const blaster = selectedItem(attacker);

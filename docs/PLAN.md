@@ -4,12 +4,12 @@ This is the durable execution record for implementing [`PRD.md`](./PRD.md). It i
 
 ## Status
 
-- Last updated: 2026-08-19
+- Last updated: 2026-08-20
 - Overall status: Implementation in progress
-- Current phase: Phase 8 - Pause, reconnect, finish, and rematch
-- Implementation progress: 8 of 11 phases complete
-- Current blocker: None for Phase 8. Two Phase 10 items are open: the exact target iPad models must still be recorded, and the owner must set a production `ADMIN_PIN` they know. The release-check pin was rotated to a value nobody holds, so production currently accepts no pin at all.
-- Next action: Start Phase 8 at immediate global pause and both-ready resume. The schema v4 Worker must be deployed before the matching frontend.
+- Current phase: Phase 9 - Worlds, teleports, tutorial, audio, and accessibility
+- Implementation progress: 9 of 11 phases complete
+- Current blocker: None for Phase 9. One Phase 10 item is open: the exact target iPad models must still be recorded.
+- Next action: Start Phase 9 at distinct geometry for the five remaining worlds, then teleports, the first-match tutorial, the Dutch catalogue audit, and the accessibility and performance passes. Deploy the schema v6 Worker before the matching frontend.
 
 Status values used below:
 
@@ -350,16 +350,16 @@ Verification:
 
 Checkpoint: an item gallery/debug seed route and fairness report in `docs/checkpoints/phase-07.md`.
 
-### [ ] Phase 8 - Pause, Reconnect, Finish, And Rematch
+### [x] Phase 8 - Pause, Reconnect, Finish, And Rematch
 
 Goal: make every interruption safe and every lifecycle transition convergent.
 
-- [ ] Implement immediate global pause, requester label, both-ready resume, authoritative 3-second countdown, and frozen movement/projectile/chest/effect clocks.
-- [ ] Implement socket-close and heartbeat-staleness safety, immediate stale-intent clearing and symmetric connection pause at 750 ms, offline status at 2 seconds, reconnect grace period, and role restoration.
-- [ ] Reconcile reconnecting clients from full snapshots without duplicate entities, claims, damage, or players.
-- [ ] Detect impossible protocol/state divergence, stop play, show a Dutch recovery message, and offer an authorized clean restart.
-- [ ] Implement winner overlay, both-player rematch consent, alternating next chooser, and exhaustive state reset.
-- [ ] Add persistence compatibility/version checks and a deployment policy that drains or explicitly resets incompatible active matches.
+- [x] Implement immediate global pause, requester label, both-ready resume, authoritative 3-second countdown, and frozen movement/projectile/chest/effect clocks.
+- [x] Implement socket-close and heartbeat-staleness safety, immediate stale-intent clearing and symmetric connection pause at 750 ms, offline status at 2 seconds, reconnect grace period, and role restoration.
+- [x] Reconcile reconnecting clients from full snapshots without duplicate entities, claims, damage, or players.
+- [x] Detect impossible protocol/state divergence, stop play, show a Dutch recovery message, and offer an authorized clean restart.
+- [x] Implement winner overlay, both-player rematch consent, alternating next chooser, and exhaustive state reset.
+- [x] Add persistence compatibility/version checks and a deployment policy that drains or explicitly resets incompatible active matches.
 
 Verification:
 
@@ -459,8 +459,8 @@ Update Status only after the required evidence is linked from Verification Evide
 | 7. Sword, throw, Nerf, weapon switch | 6 | Per-weapon unit tests and duel trace | Passed: `docs/checkpoints/phase-06.md` fixture hash and `tests/e2e/duel.spec.ts` |
 | 8. Shared authoritative hearts | 2, 6 | Forged-hit rejection and convergent snapshots | Passed: forged input rejected and cadence enforced in `tests/worker/realtime-worker.test.ts`; both clients agree on every heart change in `tests/e2e/duel.spec.ts` |
 | 9. Safe no-damage out-of-bounds return | 1, 5 | Respawn unit and browser journey | Pending |
-| 10. Pause/reconnect gives no advantage | 8 | Frozen-clock tests and offline Playwright trace | Pending |
-| 11. Zero hearts and clean rematch | 6, 8 | Finish/reset invariants and full journey | Pending |
+| 10. Pause/reconnect gives no advantage | 8 | Frozen-clock tests and offline Playwright trace | Passed: frozen clocks and symmetric freeze in `tests/unit/lifecycle.test.ts`, plus the offline journey in `tests/e2e/lifecycle.spec.ts` |
+| 11. Zero hearts and clean rematch | 6, 8 | Finish/reset invariants and full journey | Passed: exhaustive reset invariants and the winner journey with rematch consent |
 | 12. Dutch child-understandable experience | 4, 9, 10 | Catalog/tutorial automation, unassisted Luca/Senna observation, and returning-device start within 2 minutes | Pending |
 | 13. Two iPads play production URL | 10 | Physical device release report | Pending |
 | 14. Critical automation exists | All | `npm run check`, E2E reports, CI | Pending |
@@ -483,6 +483,9 @@ Update Status only after the required evidence is linked from Verification Evide
 
 | Date | Decision | Reason |
 | --- | --- | --- |
+| 2026-08-20 | A phase change is broadcast the moment it happens, outside the 15 Hz snapshot cadence. | The tick that ends a match is the last tick the room simulates. A closing snapshot that fell on a skipped tick was never sent, so about half of all finished matches were never reported to the players. |
+| 2026-08-20 | An attack press is latched until a tick consumes it, moving persisted state to schema v6. | A tap can start and end inside one 33 ms tick. Sampling only the current control state lost it, so a fast tap on a touchscreen did nothing. |
+| 2026-08-20 | Control releases are handled on the window instead of the button. | A finger sliding off a control, or a gesture the browser takes over, otherwise leaves the control held for the rest of the match and blocks every later attack. |
 | 2026-08-19 | Use a Cloudflare Durable Object as the authoritative realtime simulation and keep Vercel for the app/pairing APIs. | Vercel functions cannot host a continuous authoritative WebSocket simulation; direct WebSockets plus a single state owner fit two-player low-latency rules. |
 | 2026-08-19 | Implement a pure custom TypeScript AABB simulation and Canvas renderer rather than a browser-only physics engine. | The same rules can run authoritatively on the server and in unit tests, while rendering stays lightweight and replaceable. |
 | 2026-08-19 | Pair fixed roles with an adult PIN and revocable HttpOnly device credentials. | This prevents a browser-stored name from claiming or taking over a player and supports replacement devices. |
@@ -506,6 +509,10 @@ Update Status only after the required evidence is linked from Verification Evide
 | 2026-08-20 | Evaluate the eligible-recovery counter when a chest is scheduled, and keep the already announced contents untouched. | Deciding at scheduling time is what makes the rule testable and prevents a chest changing its contents mid-flight, which the PRD forbids. A recovery chest therefore replaces the draw rather than the chest. |
 | 2026-08-20 | Spend armor after blocking and before hearts. | This keeps a weapon worth the same damage everywhere; armor only changes who pays for it, which is what the plan means by armor-independent base damage. |
 | 2026-08-20 | Add a development-only `/debug/spawn-chest` route for the all-outcomes browser journey. | Demonstrating six chest outcomes through the real schedule would take over a minute per run. The route only skips the wait: the landing, the claim, and the reward run through the authoritative rules, and the schedule itself is unit tested. |
+| 2026-08-20 | Bump persisted game state to schema v5 for the pause reason, and keep credential generations when an incompatible checkpoint is drained. | The browser has to explain a connection pause differently from a pause a child asked for. Dropping a whole checkpoint used to drop the generations with it, which would have let a replaced device back in after an incompatible deployment. |
+| 2026-08-20 | Treat any message on a role's socket as that role's heartbeat, and require heartbeats only while a match runs or is already frozen by a connection. | The heartbeat is a statement about the connection, so a ping proves it just as well as an input. Requiring one during a lobby or countdown was wrong: nobody sends controls there, and an earlier version paused its own countdown because of it. |
+| 2026-08-20 | Freeze the match for both players when either heartbeat is late, and refuse gameplay commands from both. | An asymmetric freeze would let the healthy player attack an opponent who cannot move or block, turning a bad connection into an advantage. |
+| 2026-08-20 | Keep the room ticking while a match is frozen by a connection, and broadcast a snapshot when a socket closes. | The soak proved both were needed: without the tick the two-second offline escalation never ran, and without the broadcast the player who stayed kept watching an arena that was no longer running. |
 
 ## Verification Evidence
 
@@ -566,6 +573,11 @@ Append concise entries as work is verified. Do not replace prior evidence.
 | 2026-08-20 | Deployment | Vercel production provisioning | Passed: `ADMIN_PIN`, `SESSION_SIGNING_SECRET`, `WORKER_INTERNAL_SECRET`, and `REALTIME_URL` set as sensitive production variables, matching the production Worker's own secrets; correct pin returns 200 and a wrong pin returns a Dutch 401 | `npx vercel env ls production` |
 | 2026-08-20 | Deployment | Paired production journey | Passed: two isolated contexts paired Luca and Senna against the production URL, reached one authoritative match on the release room, both moved and converged, latency well inside the 350 ms p95 budget, and neither player took phantom damage | `tests/production/paired.spec.ts`, `docs/checkpoints/phase-07-production.png` |
 | 2026-08-20 | Deployment | Release-check credential rotation | Passed: the release-check `ADMIN_PIN` was replaced with an unheld value and production was redeployed; the old pin now returns a Dutch 401 and the read-only production suite still passes 10/10 with the paired journey correctly skipped | Live `POST /api/pair`, `npm run test:production` |
+| 2026-08-20 | Phase 8 | Focused lifecycle suite | Passed: 15 tests covering frozen clocks, symmetric heartbeat freeze, offline escalation, refusal to act while a heartbeat is late, reconnect without duplicates, disconnect from all eight phases, exhaustive reset, and alternating chooser | `tests/unit/lifecycle.test.ts` |
+| 2026-08-20 | Phase 8 | `npm run test:integration:worker` | Passed: 11 tests including an incompatible checkpoint that is drained while its credential generations survive | `tests/worker/realtime-worker.test.ts` |
+| 2026-08-20 | Phase 8 | Lifecycle browser journeys | Passed in Chromium and WebKit: a named pause needing both players, a real network outage that freezes both sides and recovers, and a winner overlay with rematch consent and a reset to the other chooser | `tests/e2e/lifecycle.spec.ts`, `docs/checkpoints/phase-08-winner.png` |
+| 2026-08-20 | Phase 8 | Disconnect soak | Passed: repeated disconnect and recovery cycles with both clients convergent on the same tick after every recovery, no duplicate entities, and health always inside bounds; the soak surfaced two real defects, both fixed | `tests/e2e/soak.spec.ts`, `docs/checkpoints/phase-08.md` |
+| 2026-08-20 | Phase 8 | `npm run check` | Passed: 172 unit, 10 Node integration, 11 Worker integration tests, formatting, typed lint, three-runtime type checks, and production build | `docs/checkpoints/phase-08.md` |
 
 ## Session Log
 
@@ -593,3 +605,5 @@ Append one row at session start and update its outcome before session end.
 | 2026-08-20 | Phase 7 | Implemented announced chests, the seeded shuffle bag, Action claims with deterministic tie resolution, all six outcomes, armor/camouflage/speed effects with HUD and opponent-visible indicators, and the eligible-recovery counter. | Complete and verified. `npm run check`, 11 Chromium and 11 WebKit journeys pass. Restart at Phase 8's first unchecked task; inspect `docs/checkpoints/phase-07.md`. |
 | 2026-08-20 | Deployment | Deployed the schema v4 Worker to preview and production, pushed the frontend, added a read-only production smoke suite, and audited the deployed environment. | Complete for everything that does not need production credentials. Production Vercel still needs its four environment variables before a device can be paired; the Worker side is already provisioned. |
 | 2026-08-20 | Deployment | Provisioned Vercel production, gave production its own release room, and ran the paired production journey from two isolated contexts. | Complete. Production is playable end to end. The temporary release-check `ADMIN_PIN` must be replaced by the owner, and those release-check device credentials are replaced automatically when the physical iPads are paired. |
+| 2026-08-20 | Phase 8 hardening | Fixed three defects the winner journey exposed: a finished match was reported to nobody when its last tick fell between two snapshots, a tap shorter than one tick was dropped, and a control release that missed its button stayed held forever. Added regression tests for all three. | Complete and verified. `npm run check` (173 unit, 10 Node, 12 Worker), both browser engines, and the disconnect soak pass; the previously intermittent winner journey passed three consecutive chain runs. Restart at Phase 9's first unchecked task. |
+| 2026-08-20 | Phase 8 | Implemented the whole lifecycle: one Dutch overlay for every interruption, pause with requester and reason, input heartbeats with a symmetric connection freeze and offline escalation, reconnect reconciliation, winner overlay with rematch consent and exhaustive reset, divergence recovery, and a checkpoint drain that keeps credential generations. | Complete and verified. `npm run check`, both browser engines, and a disconnect soak pass. Restart at Phase 9's first unchecked task; inspect `docs/checkpoints/phase-08.md`. |

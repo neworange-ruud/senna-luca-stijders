@@ -12,7 +12,9 @@ import {
 } from "./game/practice.js";
 import { CHEST_LABELS, COSMETICS, WORLDS } from "./game/content.js";
 import { TICK_RATE } from "./game/config.js";
+import { HEARTBEAT_INTERVAL_MS } from "./game/connection.js";
 import { selectedItem, selectedWeapon } from "./game/items.js";
+import { GAME_PROTOCOL_VERSION, GAME_SCHEMA_VERSION } from "./game/types.js";
 import type {
   GameCommand,
   GameSnapshot,
@@ -72,6 +74,13 @@ const pauseButton = document.querySelector<HTMLButtonElement>("#pause-button")!;
 const protectionStatus =
   document.querySelector<HTMLElement>("#protection-status")!;
 const weaponStatus = document.querySelector<HTMLElement>("#weapon-status")!;
+const stageOverlay = document.querySelector<HTMLElement>("#stage-overlay")!;
+const overlayEyebrow = document.querySelector<HTMLElement>("#overlay-eyebrow")!;
+const overlayTitle = document.querySelector<HTMLElement>("#overlay-title")!;
+const overlayMessage = document.querySelector<HTMLElement>("#overlay-message")!;
+const overlayStatus = document.querySelector<HTMLElement>("#overlay-status")!;
+const overlayAction =
+  document.querySelector<HTMLButtonElement>("#overlay-action")!;
 const effectStatus = document.querySelector<HTMLElement>("#effect-status")!;
 const effectsToggle =
   document.querySelector<HTMLButtonElement>("#effects-toggle")!;
@@ -136,6 +145,18 @@ function attachSession(role: PlayerRole, session: MatchSession): void {
             : `Traag · ${Math.round(latency)} ms`;
   });
   realtime.onSnapshot((snapshot) => {
+    // A snapshot from a different schema means this page and the server no
+    // longer agree about the rules. Stop rather than show a wrong match.
+    if (
+      snapshot.schemaVersion !== GAME_SCHEMA_VERSION ||
+      snapshot.protocolVersion !== GAME_PROTOCOL_VERSION
+    ) {
+      divergence =
+        "Het spel op dit apparaat is anders dan op de server. Laad het spel opnieuw.";
+      realtime?.stop();
+      renderOverlay(snapshot);
+      return;
+    }
     activeSnapshot = snapshot;
     commandSequence = Math.max(
       commandSequence,
@@ -156,6 +177,11 @@ function attachSession(role: PlayerRole, session: MatchSession): void {
       ? "Jullie zijn allebei verbonden."
       : "Wachten op de andere speler...";
     renderLobby(snapshot);
+    // Background pages get their timers throttled, so the heartbeat also rides
+    // on incoming snapshots: those are network events and keep arriving.
+    if (isPlaying() && Date.now() - lastInputSentAt >= HEARTBEAT_INTERVAL_MS) {
+      sendInput();
+    }
     const update = renderer?.update(snapshot);
     qualityStatus.dataset.correction = `${Math.round(
       update?.correctionPixels ?? 0,
@@ -186,6 +212,123 @@ function sendCommand(payload: Record<string, unknown>): number | null {
   } as GameCommand);
   return sent ? commandSequence : null;
 }
+
+type OverlayAction = "ready" | "rematch" | "reload" | null;
+
+let overlayAim: OverlayAction = null;
+let divergence: string | null = null;
+
+function playerName(role: PlayerRole): string {
+  return role === "luca" ? "Luca" : "Senna";
+}
+
+/**
+ * The one place that explains an interrupted match. Every state gets a Dutch
+ * title, a reason, and at most one thing to do, so a child is never left with a
+ * frozen arena and no idea why.
+ */
+function renderOverlay(snapshot: GameSnapshot): void {
+  if (!activeRole) return;
+  const { match } = snapshot.state;
+  const own = match.players[activeRole];
+  const peerRole = activeRole === "luca" ? "senna" : "luca";
+  const peer = match.players[peerRole];
+
+  if (divergence) {
+    show("player");
+    stageOverlay.hidden = false;
+    overlayEyebrow.textContent = "Probleem";
+    overlayTitle.textContent = "Het spel loopt niet gelijk";
+    overlayMessage.textContent = divergence;
+    overlayStatus.textContent = "";
+    overlayAction.hidden = false;
+    overlayAction.disabled = false;
+    overlayAction.textContent = "Spel opnieuw laden";
+    overlayAim = "reload";
+    return;
+  }
+
+  if (match.phase === "finished") {
+    stageOverlay.hidden = false;
+    overlayEyebrow.textContent = "Afgelopen";
+    overlayTitle.textContent =
+      match.winner === null
+        ? "Gelijkspel!"
+        : `${playerName(match.winner)} heeft gewonnen!`;
+    overlayMessage.textContent =
+      match.winner === activeRole
+        ? "Goed gedaan! Willen jullie nog een keer?"
+        : match.winner === null
+          ? "Jullie waren allebei op nul. Nog een keer?"
+          : "Volgende keer win jij. Nog een keer?";
+    overlayAction.hidden = false;
+    overlayAction.textContent = own.ready ? "Klaar!" : "Nog een keer";
+    overlayAction.disabled = own.ready;
+    overlayStatus.textContent = own.ready
+      ? `Wachten op ${playerName(peerRole)}...`
+      : "";
+    overlayAim = "rematch";
+    return;
+  }
+
+  if (match.phase === "reconnecting") {
+    stageOverlay.hidden = false;
+    overlayEyebrow.textContent = "Verbinding";
+    overlayTitle.textContent = "Verbinding herstellen";
+    overlayMessage.textContent = peer.connected
+      ? "Even wachten, het spel komt terug."
+      : `${playerName(peerRole)} is even weg. Het spel staat stil.`;
+    overlayAction.hidden = true;
+    overlayStatus.textContent = "";
+    overlayAim = null;
+    return;
+  }
+
+  if (match.phase === "paused") {
+    const connectionPause = match.pauseReason === "connection";
+    stageOverlay.hidden = false;
+    overlayEyebrow.textContent = connectionPause ? "Verbinding" : "Pauze";
+    overlayTitle.textContent = connectionPause
+      ? "De verbinding hapert"
+      : match.pausedBy === activeRole
+        ? "Jij hebt gepauzeerd"
+        : `${playerName(match.pausedBy ?? peerRole)} heeft gepauzeerd`;
+    overlayMessage.textContent = connectionPause
+      ? "Het spel staat voor jullie beiden stil tot het weer goed gaat."
+      : "Het spel gaat door als jullie allebei klaar zijn.";
+    overlayAction.hidden = false;
+    overlayAction.textContent = own.ready ? "Klaar!" : "Ik ben klaar";
+    overlayAction.disabled = own.ready || !peer.connected;
+    overlayStatus.textContent = !peer.connected
+      ? `Wachten tot ${playerName(peerRole)} er weer is...`
+      : own.ready
+        ? `Wachten op ${playerName(peerRole)}...`
+        : "";
+    overlayAim = "ready";
+    return;
+  }
+
+  stageOverlay.hidden = true;
+  overlayAim = null;
+}
+
+overlayAction.addEventListener("click", () => {
+  if (overlayAim === "reload") {
+    location.reload();
+    return;
+  }
+  if (overlayAim === "rematch") {
+    overlayAction.disabled = true;
+    overlayAction.textContent = "Even wachten...";
+    sendCommand({ type: "rematch" });
+    return;
+  }
+  if (overlayAim === "ready") {
+    overlayAction.disabled = true;
+    overlayAction.textContent = "Even wachten...";
+    sendCommand({ type: "ready", ready: true });
+  }
+});
 
 const MAXIMUM_HEALTH = 10;
 
@@ -270,10 +413,15 @@ function renderLobby(snapshot: GameSnapshot): void {
   const { lobby, match } = snapshot.state;
   const own = match.players[activeRole];
   const peer = match.players[activeRole === "luca" ? "senna" : "luca"];
-  const isPlaying = match.phase === "playing";
+  // The arena stays on screen while the match is paused, recovering, or
+  // finished, so the overlay explains what happened over the frozen picture.
+  const inMatch = ["playing", "paused", "reconnecting", "finished"].includes(
+    match.phase,
+  );
   playerView.dataset.phase = match.phase;
-  lobbyPanel.hidden = isPlaying;
-  gameStage.hidden = !isPlaying;
+  lobbyPanel.hidden = inMatch;
+  gameStage.hidden = !inMatch;
+  renderOverlay(snapshot);
   renderHearts(ownHearts, own.health);
   renderHearts(peerHearts, peer.health);
   weaponStatus.textContent = weaponLabel(own);
@@ -422,6 +570,7 @@ function isPlaying(): boolean {
 }
 
 let jumpWasHeld = false;
+let lastInputSentAt = 0;
 
 function sendInput(): void {
   if (!isPlaying()) return;
@@ -430,6 +579,7 @@ function sendInput(): void {
   // feedback for pressing the control. Combat sounds wait for the server.
   if (intent.jump && !jumpWasHeld) audio.play("jump");
   jumpWasHeld = intent.jump;
+  lastInputSentAt = Date.now();
   const sequence = sendCommand({ type: "input", intent });
   if (sequence !== null) renderer?.setLocalIntent(sequence, intent);
   renderControlFeedback();
@@ -455,6 +605,12 @@ function renderControlFeedback(): void {
   }
 }
 
+// The server treats silence as a failing connection, so the held controls are
+// resent on a slow interval even when nothing changes. This is the heartbeat.
+setInterval(() => {
+  if (isPlaying()) sendInput();
+}, HEARTBEAT_INTERVAL_MS);
+
 window.addEventListener("keydown", (event) => {
   if (!isPlaying() || event.repeat || !inputMapper.keyDown(event.code)) return;
   event.preventDefault();
@@ -479,12 +635,23 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(
     inputMapper.press(`pointer:${event.pointerId}`, action);
     sendInput();
   });
-  const release = (event: PointerEvent) => {
-    inputMapper.release(`pointer:${event.pointerId}`);
-    sendInput();
-  };
-  button.addEventListener("pointerup", release);
-  button.addEventListener("pointercancel", release);
+}
+
+// The release is heard on the window, not on the button. A finger that slides
+// off a control, or a gesture the browser takes over, would otherwise never
+// deliver the release, and the control would stay held down for the rest of the
+// match: after that no new press can ever start an attack again.
+function releasePointer(event: PointerEvent): void {
+  if (!inputMapper.release(`pointer:${event.pointerId}`)) return;
+  sendInput();
+}
+
+for (const eventName of [
+  "pointerup",
+  "pointercancel",
+  "lostpointercapture",
+] as const) {
+  window.addEventListener(eventName, releasePointer);
 }
 
 async function loadSession(): Promise<void> {
