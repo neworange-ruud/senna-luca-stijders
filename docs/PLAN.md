@@ -545,6 +545,7 @@ Append concise entries as work is verified. Do not replace prior evidence.
 
 | Date | Phase | Command or check | Result | Evidence |
 | --- | --- | --- | --- | --- |
+| 2026-08-20 | Phase 10 | GitHub Actions run 32378035025 | Both jobs green: `npm run check` and the full Chromium and WebKit journey suites on a clean machine from `npm ci` | GitHub Actions |
 | 2026-08-20 | Phase 10 | CI failure investigation (run 32373865779) | The screenshot showed both fighters back on their spawns with the chest gone: every resume re-initialised the arena. Fixed, with a Worker test that puts the fighters somewhere else, freezes the match, and proves both positions and the chest survive the resume | `worker/index.ts`, `tests/worker/realtime-worker.test.ts`, `tests/e2e/lifecycle.spec.ts` |
 | 2026-08-20 | Phase 10 | CI failure investigation (run 32371534677) | The failure was real: taking a screenshot stalled WebKit past the silence threshold, and the frozen match then needed both children to press ready. Fixed by resuming a freeze that never became an absence | `src/game/connection.ts`, `tests/unit/lifecycle.test.ts` |
 | 2026-08-20 | Phase 10 | `SOAK_MINUTES=30 npx playwright test tests/e2e/soak.spec.ts` | Passed: 320 disconnect cycles, 320 convergence checks, no problems, both clients ending on tick 39369 | `docs/checkpoints/phase-10.md` |
