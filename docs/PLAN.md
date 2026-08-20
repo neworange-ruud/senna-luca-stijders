@@ -8,7 +8,7 @@ This is the durable execution record for implementing [`PRD.md`](./PRD.md). It i
 - Overall status: Implementation in progress
 - Current phase: Phase 8 - Pause, reconnect, finish, and rematch
 - Implementation progress: 8 of 11 phases complete
-- Current blocker: None for Phase 8. One Phase 10 item is open: the exact target iPad models must still be recorded. Production is now provisioned and playable, but its `ADMIN_PIN` is the temporary release-check value and must be replaced by the owner's own pin before the children use it.
+- Current blocker: None for Phase 8. Two Phase 10 items are open: the exact target iPad models must still be recorded, and the owner must set a production `ADMIN_PIN` they know. The release-check pin was rotated to a value nobody holds, so production currently accepts no pin at all.
 - Next action: Start Phase 8 at immediate global pause and both-ready resume. The schema v4 Worker must be deployed before the matching frontend.
 
 Status values used below:
@@ -109,7 +109,7 @@ These are external facts, not implementation design choices. Record answers here
 | --- | --- | --- |
 | Exact model identifier and iPadOS version for Luca's iPad | Phase 10 physical gate | Develop to Safari 17/iPadOS 17 floor and common iPad landscape viewports. |
 | Exact model identifier and iPadOS version for Senna's iPad | Phase 10 physical gate | Same as above. |
-| Provider/GitHub account authorization and production secrets | Phase 2 remote gate and Phase 10 deployment | Preview and production are both provisioned: each has its own Worker, room, signing secret, and internal secret. The owner must still replace the temporary production `ADMIN_PIN` with their own before the iPads are paired. Never store real values in Git. |
+| Provider/GitHub account authorization and production secrets | Phase 2 remote gate and Phase 10 deployment | Preview and production are both provisioned: each has its own Worker, room, signing secret, and internal secret. The release-check `ADMIN_PIN` was rotated to a value nobody holds, so the owner must set their own with `vercel env add ADMIN_PIN production` and redeploy before pairing an iPad. The Worker-side secrets are in the ignored `.production-secrets.local`, which is their only copy. Never store real values in Git. |
 
 ## Target Code Shape
 
@@ -565,6 +565,7 @@ Append concise entries as work is verified. Do not replace prior evidence.
 | 2026-08-20 | Deployment | Production pairing probe | Passed as fail-closed: with `ADMIN_PIN` unset every pin, including an empty one, is rejected with a Dutch 401, so production cannot be paired until it is provisioned | Live `POST /api/pair` |
 | 2026-08-20 | Deployment | Vercel production provisioning | Passed: `ADMIN_PIN`, `SESSION_SIGNING_SECRET`, `WORKER_INTERNAL_SECRET`, and `REALTIME_URL` set as sensitive production variables, matching the production Worker's own secrets; correct pin returns 200 and a wrong pin returns a Dutch 401 | `npx vercel env ls production` |
 | 2026-08-20 | Deployment | Paired production journey | Passed: two isolated contexts paired Luca and Senna against the production URL, reached one authoritative match on the release room, both moved and converged, latency well inside the 350 ms p95 budget, and neither player took phantom damage | `tests/production/paired.spec.ts`, `docs/checkpoints/phase-07-production.png` |
+| 2026-08-20 | Deployment | Release-check credential rotation | Passed: the release-check `ADMIN_PIN` was replaced with an unheld value and production was redeployed; the old pin now returns a Dutch 401 and the read-only production suite still passes 10/10 with the paired journey correctly skipped | Live `POST /api/pair`, `npm run test:production` |
 
 ## Session Log
 

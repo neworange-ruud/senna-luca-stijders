@@ -49,7 +49,14 @@ Worker before frontend, as the plan requires:
 - Before provisioning, production rejected every pin including an empty one, so an unconfigured environment fails closed rather than open.
 - Environment isolation is structural: each environment has its own Worker, its own Durable Object room id, its own signing and internal secrets, and Redis keys prefixed with the environment name, so a preview credential cannot address production state. The runtime proof of that isolation stays a Phase 10 gate.
 
-The production `ADMIN_PIN` is a temporary release-check value. It must be replaced with the owner's own pin, and the release-check device credentials are replaced automatically the first time the physical iPads are paired.
+After the journey the release-check `ADMIN_PIN` was rotated to a value nobody holds and production was redeployed, so the pin used during the check can no longer pair anything. Production therefore accepts no pin until the owner sets one:
+
+```sh
+vercel env add ADMIN_PIN production   # type the pin, it is never echoed
+vercel redeploy <latest production deployment>
+```
+
+The release-check device credentials for Luca and Senna are still bound in production Redis; pairing each physical iPad replaces them, which is exactly the revocation path the plan describes.
 
 ## Remaining
 
