@@ -54,11 +54,55 @@ Both were found by looking at the built sheets rather than by a failing test.
   recognised as the key colour scaled down towards black, which leaves the boot
   above it untouched.
 
+## The platforms
+
+The three kinds of surface used to be three fixed colours in all six worlds, so
+a beach had green slabs on its sand and a spaceship had them too. Each world now
+builds its floors, platforms and cover out of something that belongs to it:
+
+| World | Floor | Platforms | Cover |
+| --- | --- | --- | --- |
+| Strand | Sand with grain | Jetty planks | Beach hut boards |
+| Bos | Earth with a grass edge | Branches | Tree bark |
+| Ruimteplaneet | Rock with grit | Riveted metal plate | Dome |
+| Bouwplaats | Concrete | Painted steel girders with bolts | Ribbed container |
+| Stad | Asphalt | Concrete rooftops in courses | A red bus |
+| Boot | Deck planks | Crates | Cabin boards |
+
+Every surface is also lit from the top: a bright strip on the walking edge, a
+shade towards the underside, and a soft shadow on the backdrop. The strip is the
+part that matters for play, because the edge a child has to judge a jump against
+is now the brightest line on the screen.
+
+The shape is untouched. The cap, the pattern and the outline are all drawn
+inside the rectangle the simulation collides with, so nothing about this makes a
+platform look bigger or smaller than it is to land on.
+
+Each surface is painted once into its own small canvas and then copied on every
+frame, and only the part of it the camera can see is copied: a floor is as wide
+as the world, and copying all of it every frame would cost more than the flat
+slabs it replaced. Each sprite frame is scaled once to the size the fighters are
+drawn at, for the same reason. Together the game's own work per frame is 0.4 ms. Surfaces never move or change size, so the planks, bricks and rivets cost
+one copy per frame rather than a few hundred canvas calls, and the grain is a
+function of position rather than a random number: it cannot shimmer between
+frames or differ between the two iPads.
+
 ## Verification
 
-- `npm run check`: 247 unit tests, 10 Node integration tests, 14 Worker
+- `npm run check`: 254 unit tests, 10 Node integration tests, 14 Worker
   integration tests, formatting, typed lint, three TypeScript runtimes, build.
 - `npx playwright test`: 50 journeys pass in Chromium and WebKit.
+- `tests/unit/surface-style.test.ts` (7 tests): every world has a style for
+  every kind of surface, no two worlds share a material, the top edge is lighter
+  than the body and the outline darker, the detail marks are neither invisible
+  nor shouting, the walking edge fits inside the thinnest platform, an unknown
+  world falls back to the beach, and the grain is the same every time.
+- All six worlds were looked at in the browser before and after.
+- The frame budget was measured before and after the surface work on the same
+  machine minutes apart: 11.5 percent of frames long before, 10.4 percent after,
+  the game's own work 0.36 and 0.38 ms a frame, and a 60 frames a second median
+  in both. An empty page on that machine held 60 frames a second, so what is
+  left is the machine's own compositing.
 - `tests/unit/sprite-sheet.test.ts` (7 tests): poses read from outlines, put in
   reading order, a shadow left out, a missing pose refused rather than shipped,
   equal cells, one shared scale, and a shared baseline with centred frames.

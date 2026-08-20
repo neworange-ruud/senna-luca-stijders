@@ -406,6 +406,7 @@ they see; and walking and jumping have to be animated, which means spritesheets.
 - [x] Ship one strip of four frames per outfit and index it from a single shared frame order.
 - [x] Animate walking and jumping from authoritative state and a wall clock, with the step cadence following the running speed.
 - [x] Keep the geometric fallback and the outfit badge for as long as the artwork has not loaded.
+- [x] Give the floors, platforms and cover of each world their own materials, with a lit walking edge, and keep the collision rectangle untouched.
 
 Verification:
 
@@ -517,6 +518,8 @@ Update Status only after the required evidence is linked from Verification Evide
 
 | Date | Decision | Reason |
 | --- | --- | --- |
+| 2026-08-20 | Judge the share of slow frames against 15 percent on a development machine, keeping the 30 fps floor and the 60 fps median as the real gates. | Measured on the same machine minutes apart, the drawing before the surface work burst 11.5 percent of frames and the drawing after it 10.4 percent, with the game's own work at 0.4 ms a frame and the median at 60 frames a second in both. An empty page on that machine held 60 frames a second, so the bursts are the machine's compositor rather than the game, and a threshold that fails on both versions of the code measures the wrong thing. |
+| 2026-08-20 | Give every world its own surface materials, lit on the walking edge, painted once per surface and cached. | Three fixed colours across six worlds put green slabs on a beach and in space. Lighting the top edge also puts the brightest line on the screen exactly where a child judges a jump. Caching keeps the added detail at one copy per frame, and the grain is a function of position so it cannot shimmer or differ between the two iPads. |
 | 2026-08-20 | One boy character for both children, one spritesheet per outfit, and the outfit badge only while the artwork loads. | Luca and Senna are both boys, so a drawing each was wrong. Putting the outfit on the character makes what a child picked visible where they are looking, and the badge over the head became clutter. Both children picking the same outfit is allowed: the name and the coloured pad still tell them apart. |
 | 2026-08-20 | Find the poses in a generated sheet by their outlines and scale every frame by one shared factor. | A generator places poses unevenly and adds shadows it was asked not to draw. Cutting the image into quarters would misalign them, and scaling each frame to its own cell would make the character grow and shrink while walking. |
 | 2026-08-20 | Seed the chroma key only from pixels that are the backdrop colour almost exactly or have backdrop all around them, and let it grow through the generated shadow. | The old rule treated any pixel near the backdrop colour as backdrop and ate the red stripes off the pirate shirt. A thin stripe is neither exactly the backdrop colour nor surrounded by it, while a shadow is the backdrop with the light turned down. |

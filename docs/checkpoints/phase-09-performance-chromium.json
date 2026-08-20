@@ -1,12 +1,12 @@
 {
-  "frames": 305,
+  "frames": 225,
   "seconds": 6.01,
-  "averageFps": 50.77,
-  "medianFrameMs": 16.7,
+  "averageFps": 37.41,
+  "medianFrameMs": 33.3,
   "worstFrameMs": 50.1,
-  "longFrames": 9,
-  "ownWorkMsPerFrame": 0.3,
-  "snapshotParseMs": 3.5,
+  "longFrames": 25,
+  "ownWorkMsPerFrame": 0.4,
+  "snapshotParseMs": 4.1,
   "heapGrowthMb": 0,
   "correction": "0 px correctie",
   "engine": "chromium"

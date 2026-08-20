@@ -6,6 +6,7 @@ import { hasEffect } from "../game/effects.js";
 import { selectedWeapon } from "../game/items.js";
 import type {
   ArenaDefinition,
+  ArenaSurface,
   ChestState,
   EntityState,
   GameSnapshot,
@@ -21,8 +22,11 @@ import {
   LocalMovementPrediction,
 } from "./movement-presentation.js";
 import { frameIndexFor, frameRectangle } from "./sprite-animation.js";
+import { paintSurface, surfaceStyle } from "./surface-painter.js";
 
 const FRAME_MILLISECONDS = 1_000 / 30;
+/** Widest a prepared surface may be drawn at, before its detail is stepped down. */
+const MAXIMUM_SURFACE_PIXELS = 2_048;
 const EFFECT_MILLISECONDS = 420;
 const ROLE_COLOURS: Record<PlayerRole, string> = {
   luca: "#176f9c",
@@ -54,6 +58,10 @@ export class CanvasRenderer {
   private effects: VisualEffect[] = [];
   private shownEventIds = new Set<string>();
   private readonly reducedMotion: boolean;
+  /** Each sprite frame, scaled once to the size it is drawn at. */
+  private readonly preparedFrames = new Map<string, HTMLCanvasElement>();
+  /** Each surface, drawn once at the density it is shown at. */
+  private readonly preparedSurfaces = new Map<string, HTMLCanvasElement>();
   /** The backdrop, already scaled to the height it is drawn at. */
   private scaledBackdrop: {
     key: string;
@@ -299,29 +307,117 @@ export class CanvasRenderer {
   }
 
   private drawSurfaces(context: CanvasRenderingContext2D): void {
+    const density = this.canvas.width / Math.max(1, this.canvas.clientWidth);
     for (const surface of this.arena.surfaces) {
       // A world is up to 3200 units wide while the camera shows a fraction of
       // it, so most of the geometry is off screen on every frame.
       if (!this.isVisible(surface)) continue;
-      context.fillStyle =
-        surface.kind === "floor"
-          ? "#e2be76"
-          : surface.kind === "cover"
-            ? "#9a6135"
-            : "#4b7a58";
-      context.beginPath();
-      context.roundRect(
-        surface.x,
-        surface.y,
-        surface.width,
-        surface.height,
-        surface.kind === "floor" ? 0 : 10,
+      // A shadow under the edge lifts a platform off the backdrop, which is
+      // what made the old flat slabs read as stickers. A floor spans the whole
+      // world and has no edge to lift, so it does not pay for one.
+      if (surface.kind !== "floor") {
+        context.fillStyle = "rgba(16, 40, 59, 0.22)";
+        context.beginPath();
+        context.roundRect(
+          surface.x + 5,
+          surface.y + 7,
+          surface.width,
+          surface.height,
+          10,
+        );
+        context.fill();
+      }
+      const prepared = this.preparedSurface(surface, density);
+      if (!prepared) continue;
+      // Only the part of the surface the camera can see is copied. A floor is
+      // the width of the whole world, and copying all of it every frame would
+      // cost more than the flat slabs it replaced.
+      const left = Math.max(surface.x, this.camera.x - 32);
+      const right = Math.min(
+        surface.x + surface.width,
+        this.camera.x + this.camera.width + 32,
       );
-      context.fill();
-      context.strokeStyle = "#2b1d10";
-      context.lineWidth = 4;
-      context.stroke();
+      if (right <= left) continue;
+      const scale = prepared.width / surface.width;
+      context.drawImage(
+        prepared,
+        (left - surface.x) * scale,
+        0,
+        (right - left) * scale,
+        prepared.height,
+        left,
+        surface.y,
+        right - left,
+        surface.height,
+      );
     }
+  }
+
+  /**
+   * One frame of a sheet, already scaled to the size the fighters are drawn at.
+   * A sheet is drawn several times its final size, and shrinking it on every
+   * frame is the same waste as resampling the backdrop was.
+   */
+  private preparedFrame(
+    sheet: HTMLImageElement,
+    cosmetic: string,
+    index: number,
+    frame: { x: number; y: number; width: number; height: number },
+    target: { width: number; height: number },
+  ): HTMLCanvasElement | null {
+    const width = Math.max(1, Math.round(target.width));
+    const height = Math.max(1, Math.round(target.height));
+    const key = `${cosmetic}:${index}:${width}x${height}`;
+    const cached = this.preparedFrames.get(key);
+    if (cached) return cached;
+    const canvas = document.createElement("canvas");
+    canvas.width = width * 2;
+    canvas.height = height * 2;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.drawImage(
+      sheet,
+      frame.x,
+      frame.y,
+      frame.width,
+      frame.height,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+    this.preparedFrames.set(key, canvas);
+    return canvas;
+  }
+
+  /**
+   * Draws a surface once and keeps it. Surfaces never move or change size, so
+   * the planks, bricks and rivets are worth drawing properly: they cost one
+   * copy per frame instead of a few hundred canvas calls.
+   */
+  private preparedSurface(
+    surface: ArenaSurface,
+    density: number,
+  ): HTMLCanvasElement | null {
+    const key = `${this.arena.id}:${surface.id}:${Math.round(density * 100)}`;
+    const cached = this.preparedSurfaces.get(key);
+    if (cached) return cached;
+    // A world-wide floor at full device resolution would be tens of megabytes
+    // of canvas for detail nobody can see, so the resolution of a very wide
+    // surface is stepped down instead.
+    const resolution = Math.max(
+      0.5,
+      Math.min(density, MAXIMUM_SURFACE_PIXELS / surface.width),
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(surface.width * resolution));
+    canvas.height = Math.max(1, Math.round(surface.height * resolution));
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.scale(resolution, resolution);
+    paintSurface(context, surface, surfaceStyle(this.arena.id, surface.kind));
+    this.preparedSurfaces.set(key, canvas);
+    return canvas;
   }
 
   /**
@@ -418,17 +514,34 @@ export class CanvasRenderer {
         // Blocking crouches the fighter slightly, matching the slower movement.
         context.translate(0, target.height * 0.06);
       }
-      context.drawImage(
+      const prepared = this.preparedFrame(
         sheet,
-        frame.x,
-        frame.y,
-        frame.width,
-        frame.height,
-        target.x,
-        target.y,
-        target.width,
-        target.height,
+        fighter.cosmetic ?? "knight",
+        frameIndexFor(fighter, now),
+        frame,
+        target,
       );
+      if (prepared) {
+        context.drawImage(
+          prepared,
+          target.x,
+          target.y,
+          target.width,
+          target.height,
+        );
+      } else {
+        context.drawImage(
+          sheet,
+          frame.x,
+          frame.y,
+          frame.width,
+          frame.height,
+          target.x,
+          target.y,
+          target.width,
+          target.height,
+        );
+      }
       context.restore();
     } else {
       context.fillStyle = colour;
