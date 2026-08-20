@@ -1,4 +1,4 @@
-export const GAME_SCHEMA_VERSION = 6 as const;
+export const GAME_SCHEMA_VERSION = 7 as const;
 export const GAME_PROTOCOL_VERSION = 1 as const;
 
 export type PlayerRole = "luca" | "senna";
@@ -34,6 +34,8 @@ export interface ArenaPoint extends Vector {
 }
 
 export interface TeleportDefinition extends ArenaPoint {
+  /** Shown next to the teleport so a child can see where it leads. */
+  label: string;
   destinations: readonly string[];
 }
 
@@ -76,7 +78,8 @@ export type MatchEventKind =
   | "chest-announced"
   | "chest-landed"
   | "chest-claimed"
-  | "effect-ended";
+  | "effect-ended"
+  | "teleport";
 
 /**
  * One authoritative thing that happened on a tick. Events are what the browser
@@ -169,6 +172,10 @@ export interface PlayerState {
    * consumes it.
    */
   attackQueued: boolean;
+  /** The same memory for the Action control, which claims chests and rides lifts. */
+  actionQueued: boolean;
+  /** The tick from which this player may use a teleport again. */
+  teleportReadyTick: number;
   /** -1 selects unarmed combat, otherwise the index of an inventory slot. */
   selectedSlot: number;
   lastProcessedSequence: number;

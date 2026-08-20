@@ -121,7 +121,7 @@ describe("realtime Worker", () => {
     await expect(response.json()).resolves.toMatchObject({
       status: "ok",
       protocolVersion: 1,
-      schemaVersion: 6,
+      schemaVersion: 7,
     });
   });
 
@@ -186,7 +186,7 @@ describe("realtime Worker", () => {
         state.storage.get("checkpoint"),
     );
     expect(checkpoint).toMatchObject({
-      schemaVersion: 6,
+      schemaVersion: 7,
       state: { lobby: { selectedWorld: "beach" } },
     });
     await evictDurableObject(stub, { webSockets: "close" });
@@ -573,7 +573,7 @@ describe("realtime Worker", () => {
       async (_instance: GameRoom, state: DurableObjectState) =>
         state.storage.get<{ schemaVersion: number }>("checkpoint"),
     );
-    expect(rewritten?.schemaVersion).toBe(6);
+    expect(rewritten?.schemaVersion).toBe(7);
   });
 
   it("persists revocation generations and rejects stale role tokens", async () => {

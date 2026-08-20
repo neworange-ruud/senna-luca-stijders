@@ -1,4 +1,9 @@
 import { BEACH_ARENA } from "./arenas/beach.js";
+import { BOAT_ARENA } from "./arenas/boat.js";
+import { CITY_ARENA } from "./arenas/city.js";
+import { CONSTRUCTION_ARENA } from "./arenas/construction.js";
+import { FOREST_ARENA } from "./arenas/forest.js";
+import { SPACE_ARENA } from "./arenas/space.js";
 import { CHEST_OUTCOMES } from "./types.js";
 import type {
   ArenaDefinition,
@@ -57,22 +62,29 @@ export const CHEST_LABELS: Readonly<Record<ChestOutcome, string>> = {
   speed: "Snelheid",
 };
 
-const WORLD_LABELS: Readonly<Record<WorldId, string>> = {
-  beach: "Strand",
-  forest: "Bos",
-  space: "Ruimteplaneet",
-  construction: "Bouwplaats",
-  city: "Stad",
-  boat: "Boot",
+/** Every world has its own geometry, and its label lives with it. */
+export const ARENAS: Readonly<Record<WorldId, ArenaDefinition>> = {
+  beach: BEACH_ARENA,
+  forest: FOREST_ARENA,
+  space: SPACE_ARENA,
+  construction: CONSTRUCTION_ARENA,
+  city: CITY_ARENA,
+  boat: BOAT_ARENA,
 };
 
-export const WORLDS: readonly ArenaDefinition[] = (
-  Object.entries(WORLD_LABELS) as [WorldId, string][]
-).map(([id, label]) => ({
-  ...structuredClone(BEACH_ARENA),
-  id,
-  label,
-}));
+export const WORLDS: readonly ArenaDefinition[] = Object.values(ARENAS);
+
+/**
+ * The arena a match is played in. A match that has not chosen yet, or that
+ * carries a world this build no longer knows, falls back to the beach: the
+ * simplest of the six, and the one every child has already seen.
+ */
+export function arenaForWorld(
+  world: string | null | undefined,
+): ArenaDefinition {
+  if (!world) return BEACH_ARENA;
+  return ARENAS[world as WorldId] ?? BEACH_ARENA;
+}
 
 export function validateContent(): readonly string[] {
   const issues: string[] = [];

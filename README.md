@@ -47,6 +47,23 @@ Dat script haalt de vlakke magenta achtergrond weg, snijdt het iconenblad in los
 
 Geluid en muziek worden in de browser zelf gemaakt met de Web Audio API, omdat deze Layer-werkruimte geen audiomodel heeft. Er wordt niets gestart voordat de speler iets aanraakt of indrukt, en geluid en muziek hebben aparte knoppen die hun stand onthouden.
 
+## Werelden en liften
+
+Er zijn zes werelden en ze spelen echt anders:
+
+| Wereld        | Waar het om gaat                                                      |
+| ------------- | --------------------------------------------------------------------- |
+| Strand        | De rustige wereld: een vlakke vloer met twee trappen van platformen.  |
+| Bos           | Twee boomtrappen met stammen om je achter te verstoppen.              |
+| Ruimteplaneet | Een gat in de grond met een krater als veilig eilandje in het midden. |
+| Bouwplaats    | Een steiger tegen lange balken, met containers als dekking.           |
+| Stad          | Een straat met twee daken die je alleen met de lift bereikt.          |
+| Boot          | De kleinste wereld, voor een korte partij.                            |
+
+In de stad staan liften. Een lift gaat altijd naar de lift met dezelfde naam, en die naam staat er bij, dus je ziet waar je uitkomt zonder een menu. Ga op de lift staan en druk op Actie. Staat de andere speler precies op de uitgang, dan kom je er netjes naast te staan; is er helemaal geen plek, dan blijf je staan en kun je het meteen opnieuw proberen.
+
+Boven het speelveld staat steeds een korte tip, en niet meer dan een. De tip verdwijnt zodra je de knop een keer gebruikt hebt en komt daarna niet meer terug, ook niet in een volgende wedstrijd. Een kist of een lift binnen bereik gaat altijd voor.
+
 ## Testmodus
 
 Voeg `?test=1` toe aan de URL om alleen te spelen zonder een tweede apparaat te koppelen:

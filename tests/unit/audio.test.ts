@@ -41,6 +41,8 @@ describe("sound cues", () => {
     [{ kind: "chest-landed" }, "start"],
     [{ kind: "chest-claimed", chestOutcome: "armor" }, "win"],
     [{ kind: "effect-ended", chestOutcome: "speed" }, "empty"],
+    [{ kind: "teleport", outcome: null }, "teleport"],
+    [{ kind: "teleport", outcome: "blocked" }, "empty"],
   ];
 
   for (const [partial, expected] of cases) {
@@ -74,6 +76,7 @@ describe("sound cues", () => {
       "chest-landed",
       "chest-claimed",
       "effect-ended",
+      "teleport",
     ];
     for (const kind of kinds) {
       expect(soundForEvent(matchEvent({ kind }))).not.toBeNull();

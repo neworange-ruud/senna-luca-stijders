@@ -1,0 +1,13 @@
+{
+  "frames": 39,
+  "seconds": 6.08,
+  "averageFps": 6.41,
+  "medianFrameMs": 152,
+  "worstFrameMs": 200,
+  "longFrames": 39,
+  "ownWorkMsPerFrame": 0.42,
+  "snapshotParseMs": 3,
+  "heapGrowthMb": null,
+  "correction": "0 px correctie",
+  "engine": "webkit"
+}

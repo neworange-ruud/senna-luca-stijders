@@ -6,6 +6,7 @@ import { recordEvents } from "./events.js";
 import { switchWeapon } from "./items.js";
 import { placeAtSpawn, movePlayer, type MovementResult } from "./movement.js";
 import { simulateDroppedItems } from "./pickups.js";
+import { simulateTeleports } from "./teleports.js";
 import { finishMatch } from "./state-machine.js";
 import type {
   ArenaDefinition,
@@ -50,6 +51,7 @@ export function setInputIntent(
   const wasSwitching = player.input.switchWeapon;
   // Remember a press even if it is released again before the next tick.
   if (intent.attack && !player.input.attack) player.attackQueued = true;
+  if (intent.action && !player.input.action) player.actionQueued = true;
   player.input = { ...intent };
   if (intent.switchWeapon && !wasSwitching && state.match.phase === "playing") {
     switchWeapon(player);
@@ -111,13 +113,24 @@ export function simulateMovementTick(
       tick,
     ),
   };
+  const chestEvents = simulateChests(state, arena, tick);
+  // One press does one thing: whoever just opened a chest does not also ride
+  // the lift they happen to be standing on.
+  const claimed = new Set<PlayerRole>(
+    chestEvents
+      .filter((event) => event.kind === "chest-claimed")
+      .map((event) => event.role),
+  );
   const events = [
     ...simulateCombat(state, arena, tick),
     ...simulateProjectiles(state, arena, tick, TICK_SECONDS),
     ...simulateDroppedItems(state, arena, tick, TICK_SECONDS),
-    ...simulateChests(state, arena, tick),
+    ...chestEvents,
+    ...simulateTeleports(state, arena, tick, claimed),
     ...ROLES.flatMap((role) => advanceEffects(state.match.players[role], tick)),
   ];
+  // The remembered press is used up by this tick, whatever it was used for.
+  for (const role of ROLES) state.match.players[role].actionQueued = false;
   recordEvents(state, events);
   if (
     state.match.players.luca.health === 0 ||

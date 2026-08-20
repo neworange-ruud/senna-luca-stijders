@@ -12,7 +12,9 @@ export type SoundName =
   | "countdown"
   | "start"
   | "win"
-  | "lose";
+  | "lose"
+  | "teleport"
+  | "pause";
 
 export interface SoundRecipe {
   /** Start and end frequency in hertz; the tone slides between them. */
@@ -119,6 +121,22 @@ export const SOUNDS: Readonly<Record<SoundName, SoundRecipe>> = {
     noise: 0,
     gain: 0.36,
   },
+  pause: {
+    from: 660,
+    to: 330,
+    seconds: 0.22,
+    type: "square",
+    noise: 0,
+    gain: 0.24,
+  },
+  teleport: {
+    from: 240,
+    to: 1_320,
+    seconds: 0.26,
+    type: "sine",
+    noise: 0.05,
+    gain: 0.3,
+  },
   lose: {
     from: 392,
     to: 196,
@@ -164,6 +182,9 @@ export function soundForEvent(event: MatchEvent): SoundName | null {
       return "win";
     case "effect-ended":
       return "empty";
+    case "teleport":
+      // A lift that refused to take anyone should not sound like a ride.
+      return event.outcome === "blocked" ? "empty" : "teleport";
     default:
       return null;
   }

@@ -1,4 +1,5 @@
 import { intersects } from "./arena.js";
+import { wantsAction } from "./teleports.js";
 import { CHESTS } from "./config.js";
 import { applyEffect } from "./effects.js";
 import { createItem, giveItem } from "./items.js";
@@ -212,7 +213,7 @@ export function chestClaimant(
 ): PlayerRole | null {
   const contenders = ROLES.map((role) => state.match.players[role]).filter(
     (player) =>
-      player.input.action &&
+      wantsAction(player) &&
       player.health > 0 &&
       intersects(claimRectangle(player), chestBody(chest)),
   );

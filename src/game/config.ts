@@ -70,6 +70,18 @@ export const CHESTS = {
   recoveryCount: 3,
 } as const;
 
+export const TELEPORT = {
+  /** Standing this close to a lift is close enough to use it. */
+  range: 72,
+  /** A lift will not take the same player again this soon. */
+  cooldownTicks: ticks(1_500),
+  /**
+   * Tried in order when somebody is standing in the exit. The first free spot
+   * wins, so an arrival never lands inside a wall or on top of a player.
+   */
+  arrivalOffsets: [0, 96, -96, 192, -192] as const,
+} as const;
+
 export const EFFECTS = {
   /** Armor soaks up this many damage points and then disappears. */
   armorCapacity: 3,

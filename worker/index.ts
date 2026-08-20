@@ -1,4 +1,4 @@
-import { BEACH_ARENA } from "../src/game/arenas/beach.js";
+import { arenaForWorld } from "../src/game/content.js";
 import { applyGameCommand } from "../src/game/commands.js";
 import {
   applyConnectionHealth,
@@ -26,6 +26,7 @@ import {
   isGameError,
   isPlayerRole,
   parseGameCommand,
+  type ArenaDefinition,
   type GameCommand,
   type GameError,
   type GameSnapshot,
@@ -340,11 +341,10 @@ export class GameRoom {
       this.state.match.players.senna.connected = true;
       this.state.match.players.luca.cosmetic = "knight";
       this.state.match.players.senna.cosmetic = "pirate";
-      this.state.match.arenaId = "beach";
       this.state.match.phase = "playing";
       const startedAt = Date.now();
       this.lastHeardAt = { luca: startedAt, senna: startedAt };
-      initializeArena(this.state, BEACH_ARENA);
+      initializeArena(this.state, this.arena());
       this.broadcast(this.snapshotMessage());
       this.ensureSimulationLoop();
       return json({ status: "ok" });
@@ -369,7 +369,7 @@ export class GameRoom {
       };
       const point = selectChestPoint(
         this.state,
-        BEACH_ARENA,
+        this.arena(),
         isPlayerRole(near) ? near : "luca",
       );
       if (!point)
@@ -627,6 +627,17 @@ export class GameRoom {
     this.stopSimulationLoopIfIdle();
   }
 
+  /**
+   * The arena of the world these two chose. Once play starts the choice is
+   * fixed for the whole match, and the arena is derived rather than stored so a
+   * checkpoint can never disagree with the world it says it is playing.
+   */
+  private arena(): ArenaDefinition {
+    return arenaForWorld(
+      this.state.match.arenaId ?? this.state.lobby.selectedWorld,
+    );
+  }
+
   /** The room keeps ticking while it simulates or while it watches heartbeats. */
   private needsLoop(): boolean {
     return (
@@ -697,12 +708,12 @@ export class GameRoom {
         // long quiet lobby would look like a failing connection on tick one.
         const now = Date.now();
         this.lastHeardAt = { luca: now, senna: now };
-        initializeArena(this.state, BEACH_ARENA);
+        initializeArena(this.state, this.arena());
         await this.persist();
         confirmed = true;
       }
     } else if (this.state.match.phase === "playing") {
-      const step = simulateMovementTick(this.state, BEACH_ARENA);
+      const step = simulateMovementTick(this.state, this.arena());
       if (hasIrreversibleOutcome(step)) {
         await this.persist();
         confirmed = true;

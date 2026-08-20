@@ -1,4 +1,4 @@
-import { BEACH_ARENA } from "../game/arenas/beach.js";
+import { arenaForWorld, WORLDS } from "../game/content.js";
 import { cameraTarget, followCamera, type Camera } from "../game/camera.js";
 import { CHESTS } from "../game/config.js";
 import { CHEST_LABELS } from "../game/content.js";
@@ -42,7 +42,8 @@ export class CanvasRenderer {
   private snapshot: GameSnapshot | null = null;
   private requestId = 0;
   private camera: Camera = { x: 0, y: 0, width: 1, height: 1 };
-  private readonly prediction: LocalMovementPrediction;
+  private prediction: LocalMovementPrediction;
+  private arena: ArenaDefinition;
   private readonly images = new ImageLibrary();
   private previousRemote: PlayerState | null = null;
   private currentRemote: PlayerState | null = null;
@@ -52,17 +53,22 @@ export class CanvasRenderer {
   private effects: VisualEffect[] = [];
   private shownEventIds = new Set<string>();
   private readonly reducedMotion: boolean;
+  /** The backdrop, already scaled to the height it is drawn at. */
+  private scaledBackdrop: {
+    key: string;
+    canvas: HTMLCanvasElement;
+  } | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly role: PlayerRole,
-    private readonly arena: ArenaDefinition = BEACH_ARENA,
+    arena: ArenaDefinition = arenaForWorld(null),
   ) {
+    this.arena = arena;
     this.prediction = new LocalMovementPrediction(role, this.arena);
     this.images.request(
       "sprite:luca",
       "sprite:senna",
-      `world:${this.arena.id as "beach"}`,
       "icon:sword",
       "icon:weak-sword",
       "icon:nerf",
@@ -72,6 +78,7 @@ export class CanvasRenderer {
       "icon:armor",
       "icon:speed",
       "icon:camouflage",
+      ...WORLDS.map((world) => `world:${world.id as WorldId}` as const),
     );
     this.reducedMotion =
       typeof matchMedia === "function" &&
@@ -87,6 +94,7 @@ export class CanvasRenderer {
     events: readonly MatchEvent[];
   } {
     this.snapshot = snapshot;
+    this.followWorld(snapshot);
     this.prediction.reconcile(snapshot);
     const remoteRole = this.role === "luca" ? "senna" : "luca";
     this.previousRemote =
@@ -157,6 +165,19 @@ export class CanvasRenderer {
     }
   }
 
+  /**
+   * Follows the world the match is actually being played in. The arena decides
+   * collision as well as drawing, so a stale one would predict against the
+   * wrong ground and jitter on every correction.
+   */
+  private followWorld(snapshot: GameSnapshot): void {
+    const world = snapshot.state.match.arenaId;
+    if (!world || world === this.arena.id) return;
+    this.arena = arenaForWorld(world);
+    this.prediction = new LocalMovementPrediction(this.role, this.arena);
+    this.prediction.reconcile(snapshot);
+  }
+
   private draw(
     context: CanvasRenderingContext2D,
     snapshot: GameSnapshot,
@@ -186,10 +207,12 @@ export class CanvasRenderer {
     context.save();
     context.translate(-this.camera.x, -this.camera.y);
     this.drawSurfaces(context);
+    this.drawTeleports(context, now);
     for (const chest of snapshot.state.match.chests) {
       this.drawChest(context, chest, snapshot.tick, now);
     }
     for (const entity of snapshot.state.match.entities) {
+      if (!this.isVisible({ ...entity.position, ...entity.size })) continue;
       this.drawEntity(context, entity, now);
     }
 
@@ -231,20 +254,55 @@ export class CanvasRenderer {
       context.fillRect(0, 0, width, height);
       return;
     }
+    // Resampling a full backdrop on every frame is the most expensive thing
+    // this renderer does, and the result is the same every time, so it is
+    // scaled once and then copied pixel for pixel.
+    const scale = height / backdrop.height;
+    const drawWidth = Math.max(1, Math.round(backdrop.width * scale));
+    const key = `${world}:${drawWidth}x${Math.round(height)}`;
+    if (this.scaledBackdrop?.key !== key) {
+      const scaled = document.createElement("canvas");
+      scaled.width = drawWidth;
+      scaled.height = Math.max(1, Math.round(height));
+      const scaledContext = scaled.getContext("2d");
+      if (!scaledContext) return;
+      scaledContext.drawImage(backdrop, 0, 0, scaled.width, scaled.height);
+      this.scaledBackdrop = { key, canvas: scaled };
+    }
+    const prepared = this.scaledBackdrop.canvas;
     // The backdrop pans slower than the arena, which reads as depth without
     // moving anything the players can stand on.
-    const scale = height / backdrop.height;
-    const drawWidth = backdrop.width * scale;
     const span = Math.max(1, this.arena.bounds.width - width);
-    const offset = -(this.camera.x / span) * Math.max(0, drawWidth - width);
-    context.drawImage(backdrop, offset, 0, drawWidth, height);
+    const offset = Math.round(
+      -(this.camera.x / span) * Math.max(0, drawWidth - width),
+    );
+    context.drawImage(prepared, offset, 0);
     if (drawWidth + offset < width) {
-      context.drawImage(backdrop, offset + drawWidth, 0, drawWidth, height);
+      context.drawImage(prepared, offset + drawWidth, 0);
     }
+  }
+
+  /** True when a box is somewhere the camera can actually see. */
+  private isVisible(box: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }): boolean {
+    const margin = 64;
+    return (
+      box.x + box.width >= this.camera.x - margin &&
+      box.x <= this.camera.x + this.camera.width + margin &&
+      box.y + box.height >= this.camera.y - margin &&
+      box.y <= this.camera.y + this.camera.height + margin
+    );
   }
 
   private drawSurfaces(context: CanvasRenderingContext2D): void {
     for (const surface of this.arena.surfaces) {
+      // A world is up to 3200 units wide while the camera shows a fraction of
+      // it, so most of the geometry is off screen on every frame.
+      if (!this.isVisible(surface)) continue;
       context.fillStyle =
         surface.kind === "floor"
           ? "#e2be76"
@@ -263,6 +321,56 @@ export class CanvasRenderer {
       context.strokeStyle = "#2b1d10";
       context.lineWidth = 4;
       context.stroke();
+    }
+  }
+
+  /**
+   * Draws each lift as a lit doorway with its own name. Two lifts that lead to
+   * each other carry the same name, which is how a child sees where it goes
+   * without reading a menu.
+   */
+  private drawTeleports(context: CanvasRenderingContext2D, now: number): void {
+    const pulse = this.reducedMotion ? 0.7 : 0.55 + 0.25 * Math.sin(now / 320);
+    for (const teleport of this.arena.teleports) {
+      const width = 92;
+      const height = 132;
+      const x = teleport.x - width / 2;
+      const y = teleport.y - height;
+      if (!this.isVisible({ x, y, width, height })) continue;
+
+      context.fillStyle = "#1d2b4a";
+      context.beginPath();
+      context.roundRect(x, y, width, height, 14);
+      context.fill();
+      context.strokeStyle = "#f5d67b";
+      context.lineWidth = 5;
+      context.stroke();
+
+      context.globalAlpha = pulse;
+      context.fillStyle = "#8fd8ff";
+      context.beginPath();
+      context.roundRect(x + 14, y + 16, width - 28, height - 30, 10);
+      context.fill();
+      context.globalAlpha = 1;
+
+      // The arrow says which way this lift travels, up or down.
+      const upwards = teleport.y > 1_000;
+      context.fillStyle = "#0d1a30";
+      context.beginPath();
+      const centre = teleport.x;
+      const tip = upwards ? y + 40 : y + height - 44;
+      const base = upwards ? y + 84 : y + height - 88;
+      context.moveTo(centre, tip);
+      context.lineTo(centre - 22, base);
+      context.lineTo(centre + 22, base);
+      context.closePath();
+      context.fill();
+
+      context.font = "600 26px system-ui, sans-serif";
+      context.fillStyle = "#0d1a30";
+      context.textAlign = "center";
+      context.fillText(teleport.label, centre, y - 12);
+      context.textAlign = "left";
     }
   }
 

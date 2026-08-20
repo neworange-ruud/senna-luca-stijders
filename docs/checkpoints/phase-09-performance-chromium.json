@@ -1,0 +1,13 @@
+{
+  "frames": 333,
+  "seconds": 6,
+  "averageFps": 55.49,
+  "medianFrameMs": 16.7,
+  "worstFrameMs": 50,
+  "longFrames": 7,
+  "ownWorkMsPerFrame": 0.28,
+  "snapshotParseMs": 3.3,
+  "heapGrowthMb": 0,
+  "correction": "0 px correctie",
+  "engine": "chromium"
+}

@@ -203,6 +203,10 @@
               <strong>Krachten</strong>
               <span id="effect-status">Geen</span>
             </div>
+            <div class="world-slot">
+              <strong>Wereld</strong>
+              <span id="world-status">Strand</span>
+            </div>
             <div class="quality">
               <strong>Verbinding</strong>
               <span id="quality-status">Meten...</span>
@@ -222,6 +226,16 @@
             </div>
             <button id="pause-button" type="button">Pauze</button>
           </div>
+          <p
+            id="hint-line"
+            class="hint"
+            role="status"
+            aria-live="polite"
+            hidden
+          >
+            <span class="hint-icon" aria-hidden="true">?</span>
+            <span id="hint-text"></span>
+          </p>
           <canvas
             id="game-canvas"
             aria-label="Arena met Luca en Senna"

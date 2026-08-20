@@ -54,6 +54,25 @@ function canTraverse(from: ArenaSurface, to: ArenaSurface): boolean {
   );
 }
 
+/** Where each teleport leads, by the surface it stands on. */
+function teleportLinks(
+  arena: ArenaDefinition,
+): ReadonlyMap<string, readonly string[]> {
+  const bySurface = new Map<string, string[]>();
+  const surfaceOf = new Map(
+    arena.teleports.map((teleport) => [teleport.id, teleport.surfaceId]),
+  );
+  for (const teleport of arena.teleports) {
+    const targets = teleport.destinations
+      .map((destination) => surfaceOf.get(destination))
+      .filter((surfaceId): surfaceId is string => Boolean(surfaceId));
+    const known = bySurface.get(teleport.surfaceId) ?? [];
+    known.push(...targets);
+    bySurface.set(teleport.surfaceId, known);
+  }
+  return bySurface;
+}
+
 export function reachableSurfaceIds(
   arena: ArenaDefinition,
 ): ReadonlySet<string> {
@@ -61,6 +80,10 @@ export function reachableSurfaceIds(
     (surface) => surface.kind !== "cover",
   );
   const surfaces = new Map(navigable.map((surface) => [surface.id, surface]));
+  // A teleport is a way to travel, so it counts towards reachability. Without
+  // this a rooftop that only a lift can reach would look unreachable, and the
+  // city would have to be flattened into another beach.
+  const links = teleportLinks(arena);
   const reachable = new Set<string>();
   const pending = [...arena.spawns.luca, ...arena.spawns.senna]
     .map((spawn) => spawn.surfaceId)
@@ -76,6 +99,9 @@ export function reachableSurfaceIds(
       if (!reachable.has(candidate.id) && canTraverse(current, candidate)) {
         pending.push(candidate.id);
       }
+    }
+    for (const linked of links.get(id) ?? []) {
+      if (!reachable.has(linked) && surfaces.has(linked)) pending.push(linked);
     }
   }
   return reachable;

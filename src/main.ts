@@ -10,7 +10,21 @@ import {
   PRACTICE_BEHAVIOUR_LABELS,
   type PracticeBehaviour,
 } from "./game/practice.js";
-import { CHEST_LABELS, COSMETICS, WORLDS } from "./game/content.js";
+import {
+  arenaForWorld,
+  CHEST_LABELS,
+  COSMETICS,
+  WORLDS,
+} from "./game/content.js";
+import { PHASE_LABELS, WEAPON_LABELS } from "./game/dutch.js";
+import {
+  chooseHint,
+  HINT_STORAGE_KEY,
+  readLearned,
+  writeLearned,
+  type HintId,
+} from "./client/hints.js";
+import { teleportUnderPlayer } from "./game/teleports.js";
 import { TICK_RATE } from "./game/config.js";
 import { HEARTBEAT_INTERVAL_MS } from "./game/connection.js";
 import { selectedItem, selectedWeapon } from "./game/items.js";
@@ -19,6 +33,7 @@ import type {
   GameCommand,
   GameSnapshot,
   ItemId,
+  MatchPhase,
   PlayerRole,
   PlayerState,
 } from "./game/types.js";
@@ -82,6 +97,9 @@ const overlayStatus = document.querySelector<HTMLElement>("#overlay-status")!;
 const overlayAction =
   document.querySelector<HTMLButtonElement>("#overlay-action")!;
 const effectStatus = document.querySelector<HTMLElement>("#effect-status")!;
+const worldStatus = document.querySelector<HTMLElement>("#world-status")!;
+const hintLine = document.querySelector<HTMLElement>("#hint-line")!;
+const hintText = document.querySelector<HTMLElement>("#hint-text")!;
 const effectsToggle =
   document.querySelector<HTMLButtonElement>("#effects-toggle")!;
 const musicToggle = document.querySelector<HTMLButtonElement>("#music-toggle")!;
@@ -100,18 +118,23 @@ function setConnection(state: string, label: string): void {
   connectionLabel.textContent = label;
 }
 
+let soundedPhase: MatchPhase | null = null;
+
+/**
+ * Pausing and counting down are phases rather than events, so their sound is
+ * played when the phase the browser is showing changes. Gameplay sounds still
+ * come from authoritative events only.
+ */
+function playPhaseSound(phase: MatchPhase): void {
+  if (phase === soundedPhase) return;
+  soundedPhase = phase;
+  if (phase === "paused") audio.play("pause");
+  if (phase === "countdown") audio.play("countdown");
+  if (phase === "playing") audio.play("start");
+}
+
 function phaseLabel(phase: GameSnapshot["state"]["match"]["phase"]): string {
-  const labels = {
-    waiting: "Wachten",
-    "world-selection": "Wereld kiezen",
-    ready: "Klaarmaken",
-    countdown: "Aftellen",
-    playing: "Spelen",
-    paused: "Gepauzeerd",
-    reconnecting: "Verbinding herstellen",
-    finished: "Afgelopen",
-  } as const;
-  return labels[phase];
+  return PHASE_LABELS[phase];
 }
 
 function attachSession(role: PlayerRole, session: MatchSession): void {
@@ -176,6 +199,7 @@ function attachSession(role: PlayerRole, session: MatchSession): void {
     document.querySelector("#game-status")!.textContent = peer.connected
       ? "Jullie zijn allebei verbonden."
       : "Wachten op de andere speler...";
+    playPhaseSound(snapshot.state.match.phase);
     renderLobby(snapshot);
     // Background pages get their timers throttled, so the heartbeat also rides
     // on incoming snapshots: those are network events and keep arriving.
@@ -355,13 +379,6 @@ function renderHearts(target: HTMLElement, health: number): void {
   target.ariaLabel = `${health} van de ${MAXIMUM_HEALTH} harten`;
 }
 
-const WEAPON_LABELS: Record<string, string> = {
-  unarmed: "Vuisten",
-  sword: "Zwaard",
-  "weak-sword": "Klein zwaard",
-  nerf: "Blaster",
-};
-
 const EFFECT_ICONS: Record<string, string> = {
   armor: "/art/icons/armor.png",
   camouflage: "/art/icons/camouflage.png",
@@ -408,6 +425,52 @@ function weaponLabel(player: PlayerState): string {
     : `${label} · ${ammo} pijltjes`;
 }
 
+/**
+ * Shows at most one short instruction, and remembers what has been explained so
+ * the second match is not full of tips. A lift or a chest in reach always wins,
+ * because those are about what is in front of the child right now.
+ */
+function renderHint(snapshot: GameSnapshot): void {
+  if (!activeRole) return;
+  const { match } = snapshot.state;
+  const own = match.players[activeRole];
+  const peer = match.players[activeRole === "luca" ? "senna" : "luca"];
+  const arena = arenaForWorld(match.arenaId);
+  const nearby = teleportUnderPlayer(own, arena);
+  const claimable = match.chests.some(
+    (chest) =>
+      snapshot.tick >= chest.landsAtTick &&
+      Math.abs(chest.position.x - (own.position.x + own.size.width / 2)) <= 160,
+  );
+  const hint = chooseHint({
+    phase: match.phase,
+    used: usedControls,
+    learned: learnedHints,
+    opponentDistance: Math.abs(peer.position.x - own.position.x),
+    chestWithinReach: claimable,
+    teleportLabel: nearby ? nearby.label : null,
+    holdsTwoWeapons: own.inventory.length > 1,
+  });
+  hintLine.hidden = hint === null;
+  hintText.textContent = hint?.text ?? "";
+}
+
+/**
+ * Records that this child has used a control. Doing a thing is what counts as
+ * having learned it, so the hint for it never comes back, not even next week on
+ * the same iPad.
+ */
+function markUsed(id: HintId): void {
+  usedControls.add(id);
+  if (learnedHints.has(id)) return;
+  learnedHints = new Set([...learnedHints, id]);
+  try {
+    localStorage.setItem(HINT_STORAGE_KEY, writeLearned(learnedHints));
+  } catch {
+    // A locked-down browser store only costs the child a repeated tip.
+  }
+}
+
 function renderLobby(snapshot: GameSnapshot): void {
   if (!activeRole) return;
   const { lobby, match } = snapshot.state;
@@ -430,6 +493,16 @@ function renderLobby(snapshot: GameSnapshot): void {
   const direction = peer.position.x < own.position.x ? "links" : "rechts";
   opponentStatus.textContent = `${direction} · ${Math.round(distance / 10)} m`;
   opponentStatus.dataset.distance = String(Math.round(distance));
+  // Both feet, so a journey can prove that a lift really moved somebody.
+  opponentStatus.dataset.ownY = String(
+    Math.round(own.position.y + own.size.height),
+  );
+  opponentStatus.dataset.peerY = String(
+    Math.round(peer.position.y + peer.size.height),
+  );
+  const world = arenaForWorld(match.arenaId ?? lobby.selectedWorld);
+  worldStatus.textContent = world.label;
+  renderHint(snapshot);
   protectionStatus.hidden = own.invulnerableUntilTick <= snapshot.tick;
   pauseButton.disabled = match.phase !== "playing";
   pauseButton.textContent = "Pauze";
@@ -530,6 +603,7 @@ readyButton.addEventListener("click", () => {
 });
 
 pauseButton.addEventListener("click", () => {
+  markUsed("pause");
   pauseButton.disabled = true;
   pauseButton.textContent = "Pauze aanvragen...";
   if (sendCommand({ type: "pause" }) === null) {
@@ -571,6 +645,13 @@ function isPlaying(): boolean {
 
 let jumpWasHeld = false;
 let lastInputSentAt = 0;
+/** Controls this child has actually used, so a hint never nags about them. */
+const usedControls = new Set<HintId>();
+let learnedHints = readLearned(
+  typeof localStorage === "undefined"
+    ? null
+    : localStorage.getItem(HINT_STORAGE_KEY),
+);
 
 function sendInput(): void {
   if (!isPlaying()) return;
@@ -579,6 +660,11 @@ function sendInput(): void {
   // feedback for pressing the control. Combat sounds wait for the server.
   if (intent.jump && !jumpWasHeld) audio.play("jump");
   jumpWasHeld = intent.jump;
+  if (intent.horizontal !== 0) markUsed("move");
+  if (intent.jump) markUsed("jump");
+  if (intent.attack) markUsed("attack");
+  if (intent.block) markUsed("block");
+  if (intent.switchWeapon) markUsed("switch");
   lastInputSentAt = Date.now();
   const sequence = sendCommand({ type: "input", intent });
   if (sequence !== null) renderer?.setLocalIntent(sequence, intent);

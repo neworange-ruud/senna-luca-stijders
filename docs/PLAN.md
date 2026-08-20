@@ -6,10 +6,10 @@ This is the durable execution record for implementing [`PRD.md`](./PRD.md). It i
 
 - Last updated: 2026-08-20
 - Overall status: Implementation in progress
-- Current phase: Phase 9 - Worlds, teleports, tutorial, audio, and accessibility
-- Implementation progress: 9 of 11 phases complete
-- Current blocker: None for Phase 9. One Phase 10 item is open: the exact target iPad models must still be recorded.
-- Next action: Start Phase 9 at distinct geometry for the five remaining worlds, then teleports, the first-match tutorial, the Dutch catalogue audit, and the accessibility and performance passes. Deploy the schema v6 Worker before the matching frontend.
+- Current phase: Phase 10 - Final headless acceptance, deployment, and physical release
+- Implementation progress: 10 of 11 phases complete
+- Current blocker: None for the automated part of Phase 10. Two items need the physical devices: the exact target iPad model identifiers, and the unassisted first-use and frame-rate measurements on them.
+- Next action: Start Phase 10 at the acceptance-criterion mapping, then the security and dependency audit. Deploy the schema v7 Worker before the matching frontend.
 
 Status values used below:
 
@@ -371,17 +371,17 @@ Verification:
 
 Checkpoint: `docs/checkpoints/phase-08.md` contains the lifecycle matrix, soak report, and Playwright trace of disconnect/reconnect/rematch.
 
-### [ ] Phase 9 - Worlds, Teleports, Tutorial, Audio, And Accessibility
+### [x] Phase 9 - Worlds, Teleports, Tutorial, Audio, And Accessibility
 
 Goal: finish P1 content and make the complete experience understandable and robust for the target children.
 
-- [ ] Give forest, space planet, construction site, city, and boat distinct validated geometry using the same game systems.
-- [ ] Add linked teleports to at least one arena with clear destination choice, cooldown, safe arrival, and tests for blocked/invalid destinations.
-- [ ] Finish first-match contextual hints for movement, jump, attack, block, Action, weapon switch, chests, and pause.
-- [ ] Centralize and audit all Dutch text, status, instruction, and error paths; remove the English demonstration UI.
-- [ ] Add generated placeholder sounds for jump, block, hit, chest opening, weapon use, pause, and countdown plus simple music; require first-interaction audio start, separate persistent mute controls, and no audio dependency for gameplay cues.
-- [ ] Verify touch target sizes, contrast, icon-plus-text cues, focus order, screen-reader labels outside the canvas, reduced motion, orientation messaging, safe areas, and prevention of accidental browser gestures.
-- [ ] Optimize rendering allocations and entity culling to sustain 60 fps target/30 fps floor on representative throttled profiles.
+- [x] Give forest, space planet, construction site, city, and boat distinct validated geometry using the same game systems.
+- [x] Add linked teleports to at least one arena with clear destination choice, cooldown, safe arrival, and tests for blocked/invalid destinations.
+- [x] Finish first-match contextual hints for movement, jump, attack, block, Action, weapon switch, chests, and pause.
+- [x] Centralize and audit all Dutch text, status, instruction, and error paths; remove the English demonstration UI.
+- [x] Add generated placeholder sounds for jump, block, hit, chest opening, weapon use, pause, and countdown plus simple music; require first-interaction audio start, separate persistent mute controls, and no audio dependency for gameplay cues.
+- [x] Verify touch target sizes, contrast, icon-plus-text cues, focus order, screen-reader labels outside the canvas, reduced motion, orientation messaging, safe areas, and prevention of accidental browser gestures.
+- [x] Optimize rendering allocations and entity culling to sustain 60 fps target/30 fps floor on representative throttled profiles.
 
 Verification:
 
@@ -483,6 +483,11 @@ Update Status only after the required evidence is linked from Verification Evide
 
 | Date | Decision | Reason |
 | --- | --- | --- |
+| 2026-08-20 | Every world has its own arena file, and the arena is derived from the world the match is playing. | Six worlds that all played on the beach geometry were six names for one world. Deriving the arena instead of storing it means a checkpoint can never disagree with the world it says it is in. |
+| 2026-08-20 | Reachability treats a teleport as a way to travel. | A rooftop that only a lift can reach would otherwise be reported unreachable, and the city would have had to be flattened into another beach. |
+| 2026-08-20 | A teleport leads to exactly one other teleport, and both ends carry the same name on screen. | A list of destinations needs a menu in the middle of a fight. A named pair shows a seven-year-old where the lift goes without reading anything. |
+| 2026-08-20 | Remember an Action press until a tick consumes it, moving persisted state to schema v7 together with the lift cooldown. | Chests already had the same defect the attack had: a tap shorter than one tick was dropped, so a child tapping quickly next to a chest saw nothing happen. |
+| 2026-08-20 | Assert the frame rate only where the browser composites on a GPU, and assert the game's own per-frame work everywhere. | Headless WebKit on the build machine rasterises in software: an empty page holds 60 fps, a match holds 7, and rendering the same match at 24 percent of the pixels tracks the pixel count. Its frame rate says nothing about an iPad, while the 0.32 ms the game spends per frame does. The 30 fps floor on the target devices is measured physically in Phase 10 rather than lowered. |
 | 2026-08-20 | A phase change is broadcast the moment it happens, outside the 15 Hz snapshot cadence. | The tick that ends a match is the last tick the room simulates. A closing snapshot that fell on a skipped tick was never sent, so about half of all finished matches were never reported to the players. |
 | 2026-08-20 | An attack press is latched until a tick consumes it, moving persisted state to schema v6. | A tap can start and end inside one 33 ms tick. Sampling only the current control state lost it, so a fast tap on a touchscreen did nothing. |
 | 2026-08-20 | Control releases are handled on the window instead of the button. | A finger sliding off a control, or a gesture the browser takes over, otherwise leaves the control held for the rest of the match and blocks every later attack. |
@@ -605,5 +610,6 @@ Append one row at session start and update its outcome before session end.
 | 2026-08-20 | Phase 7 | Implemented announced chests, the seeded shuffle bag, Action claims with deterministic tie resolution, all six outcomes, armor/camouflage/speed effects with HUD and opponent-visible indicators, and the eligible-recovery counter. | Complete and verified. `npm run check`, 11 Chromium and 11 WebKit journeys pass. Restart at Phase 8's first unchecked task; inspect `docs/checkpoints/phase-07.md`. |
 | 2026-08-20 | Deployment | Deployed the schema v4 Worker to preview and production, pushed the frontend, added a read-only production smoke suite, and audited the deployed environment. | Complete for everything that does not need production credentials. Production Vercel still needs its four environment variables before a device can be paired; the Worker side is already provisioned. |
 | 2026-08-20 | Deployment | Provisioned Vercel production, gave production its own release room, and ran the paired production journey from two isolated contexts. | Complete. Production is playable end to end. The temporary release-check `ADMIN_PIN` must be replaced by the owner, and those release-check device credentials are replaced automatically when the physical iPads are paired. |
+| 2026-08-20 | Phase 9 | Gave all six worlds their own validated geometry, added named lifts to the city with cooldown and safe arrival, added one-at-a-time Dutch hints that stop once a control is used, centralised and audited every Dutch label, added a pause cue, and ran automated accessibility and performance passes. | Complete and verified. `npm run check` (228 unit, 10 Node, 12 Worker) and 43 journeys in both engines pass; frame reports are in `docs/checkpoints/`. Restart at Phase 10's first unchecked task; inspect `docs/checkpoints/phase-09.md`. |
 | 2026-08-20 | Phase 8 hardening | Fixed three defects the winner journey exposed: a finished match was reported to nobody when its last tick fell between two snapshots, a tap shorter than one tick was dropped, and a control release that missed its button stayed held forever. Added regression tests for all three. | Complete and verified. `npm run check` (173 unit, 10 Node, 12 Worker), both browser engines, and the disconnect soak pass; the previously intermittent winner journey passed three consecutive chain runs. Restart at Phase 9's first unchecked task. |
 | 2026-08-20 | Phase 8 | Implemented the whole lifecycle: one Dutch overlay for every interruption, pause with requester and reason, input heartbeats with a symmetric connection freeze and offline escalation, reconnect reconciliation, winner overlay with rematch consent and exhaustive reset, divergence recovery, and a checkpoint drain that keeps credential generations. | Complete and verified. `npm run check`, both browser engines, and a disconnect soak pass. Restart at Phase 9's first unchecked task; inspect `docs/checkpoints/phase-08.md`. |
