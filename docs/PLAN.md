@@ -6,10 +6,10 @@ This is the durable execution record for implementing [`PRD.md`](./PRD.md). It i
 
 - Last updated: 2026-08-20
 - Overall status: Feature complete and deployed; waiting on the two physical iPads
-- Current phase: Phase 10 - Final headless acceptance, deployment, and physical release
-- Implementation progress: 10 of 11 phases complete
+- Current phase: Phase 10 - Final headless acceptance, deployment, and physical release. Phase 11 (animated player sprites) was added afterwards at the owner's request and is complete.
+- Implementation progress: 11 of 12 phases complete; Phase 11 was added at the owner's request after Phase 10
 - Current blocker: None for the automated part of Phase 10. Two items need the physical devices: the exact target iPad model identifiers, and the unassisted first-use and frame-rate measurements on them.
-- Next action: Pair the two iPads with the production pin, then run the observed first-use and full-match journeys and record the device identifiers, time to start, comprehension, multi-touch, frame rate, and latency. Everything that can be checked without a device is done and deployed on schema v7.
+- Next action: Pair the two iPads with the production pin, then run the observed first-use and full-match journeys and record the device identifiers, time to start, comprehension, multi-touch, frame rate, and latency. Everything that can be checked without a device is done and deployed on schema v8.
 
 Status values used below:
 
@@ -395,6 +395,26 @@ Verification:
 
 Checkpoint: a six-world selector/gallery, accessibility report, and performance report in `docs/checkpoints/phase-09.md`.
 
+### [x] Phase 11 - Animated Player Sprites
+
+Requested by the owner on 2026-08-20, after Phase 10: both children are boys, so
+one boy character serves both; the outfit a child picks has to be the character
+they see; and walking and jumping have to be animated, which means spritesheets.
+
+- [x] Generate one 2x2 pose block per outfit (standing, two walking steps, jump) with the cheapest enabled image model, priced before each run.
+- [x] Slice the poses by their own outlines, drop the generated drop shadows, scale every frame by one shared factor and stand them on a shared baseline.
+- [x] Ship one strip of four frames per outfit and index it from a single shared frame order.
+- [x] Animate walking and jumping from authoritative state and a wall clock, with the step cadence following the running speed.
+- [x] Keep the geometric fallback and the outfit badge for as long as the artwork has not loaded.
+
+Verification:
+
+- Unit tests for the slicing and for the frame choice
+- A dual-client journey proving the sheets are served, walked and jumped
+- `npm run check` and both browser engines
+
+Checkpoint: `docs/checkpoints/phase-11.md` with the three captured states.
+
 ### [~] Phase 10 - Final Headless Acceptance, Deployment, And Physical Release
 
 Goal: verify the whole product, deploy isolated environments, and leave an operable release.
@@ -497,6 +517,9 @@ Update Status only after the required evidence is linked from Verification Evide
 
 | Date | Decision | Reason |
 | --- | --- | --- |
+| 2026-08-20 | One boy character for both children, one spritesheet per outfit, and the outfit badge only while the artwork loads. | Luca and Senna are both boys, so a drawing each was wrong. Putting the outfit on the character makes what a child picked visible where they are looking, and the badge over the head became clutter. Both children picking the same outfit is allowed: the name and the coloured pad still tell them apart. |
+| 2026-08-20 | Find the poses in a generated sheet by their outlines and scale every frame by one shared factor. | A generator places poses unevenly and adds shadows it was asked not to draw. Cutting the image into quarters would misalign them, and scaling each frame to its own cell would make the character grow and shrink while walking. |
+| 2026-08-20 | Seed the chroma key only from pixels that are the backdrop colour almost exactly or have backdrop all around them, and let it grow through the generated shadow. | The old rule treated any pixel near the backdrop colour as backdrop and ate the red stripes off the pirate shirt. A thin stripe is neither exactly the backdrop colour nor surrounded by it, while a shadow is the backdrop with the light turned down. |
 | 2026-08-20 | Allow a wider burst of slow frames on the build runner than on a real machine, while keeping the 30 fps floor and the 60 fps median assertions everywhere. | The floor and the median are the PRD requirements and both hold on the runner. The share of slow frames is a metric of this repository's own making, and a shared two-core runner without a GPU bursts in a way no iPad does. The floor on the devices is still measured on the devices. |
 | 2026-08-20 | Only a match that is starting gets a fresh arena; resuming after a pause leaves everything where the children left it. | Every resume ran the same start-of-match initialisation, so a pause put both fighters back on their spawns, deleted an announced chest, and reset the chest clock. That contradicts the Phase 8 rule that a returning player finds the same match, and it went unnoticed because the pause journey only checked hearts and phase. |
 | 2026-08-20 | A connection freeze that never became an absence resumes itself through the normal countdown, which moves persisted state to schema v8. | Three missed heartbeats is a stall on the wifi, not a player leaving. Making two children press a button after a one-second hiccup punishes them for their router. A freeze that did reach the two-second absence rule still waits for both of them, because then somebody really was gone. |
@@ -545,6 +568,8 @@ Append concise entries as work is verified. Do not replace prior evidence.
 
 | Date | Phase | Command or check | Result | Evidence |
 | --- | --- | --- | --- | --- |
+| 2026-08-20 | Phase 11 | `npm run assets` and visual inspection of every built sheet | Five strips of four frames, aligned on one baseline at one scale, stripes and hat bands intact, generated shadows gone | `public/art/sprites/`, `docs/checkpoints/phase-11.md` |
+| 2026-08-20 | Phase 11 | `npm run check` and `npx playwright test` | 247 unit, 10 Node, 14 Worker tests and 50 journeys in both engines pass | `docs/checkpoints/phase-11.md` |
 | 2026-08-20 | Phase 10 | GitHub Actions run 32378035025 | Both jobs green: `npm run check` and the full Chromium and WebKit journey suites on a clean machine from `npm ci` | GitHub Actions |
 | 2026-08-20 | Phase 10 | CI failure investigation (run 32373865779) | The screenshot showed both fighters back on their spawns with the chest gone: every resume re-initialised the arena. Fixed, with a Worker test that puts the fighters somewhere else, freezes the match, and proves both positions and the chest survive the resume | `worker/index.ts`, `tests/worker/realtime-worker.test.ts`, `tests/e2e/lifecycle.spec.ts` |
 | 2026-08-20 | Phase 10 | CI failure investigation (run 32371534677) | The failure was real: taking a screenshot stalled WebKit past the silence threshold, and the frozen match then needed both children to press ready. Fixed by resuming a freeze that never became an absence | `src/game/connection.ts`, `tests/unit/lifecycle.test.ts` |
@@ -649,6 +674,7 @@ Append one row at session start and update its outcome before session end.
 | 2026-08-20 | Phase 7 | Implemented announced chests, the seeded shuffle bag, Action claims with deterministic tie resolution, all six outcomes, armor/camouflage/speed effects with HUD and opponent-visible indicators, and the eligible-recovery counter. | Complete and verified. `npm run check`, 11 Chromium and 11 WebKit journeys pass. Restart at Phase 8's first unchecked task; inspect `docs/checkpoints/phase-07.md`. |
 | 2026-08-20 | Deployment | Deployed the schema v4 Worker to preview and production, pushed the frontend, added a read-only production smoke suite, and audited the deployed environment. | Complete for everything that does not need production credentials. Production Vercel still needs its four environment variables before a device can be paired; the Worker side is already provisioned. |
 | 2026-08-20 | Deployment | Provisioned Vercel production, gave production its own release room, and ran the paired production journey from two isolated contexts. | Complete. Production is playable end to end. The temporary release-check `ADMIN_PIN` must be replaced by the owner, and those release-check device credentials are replaced automatically when the physical iPads are paired. |
+| 2026-08-20 | Phase 11 | Replaced the two per-player drawings with one animated spritesheet per outfit: five generated pose blocks, outline-based slicing with shared scale and baseline, a four-frame walk cycle whose cadence follows the running speed, and a jump frame. Fixed two chroma-key defects the new artwork exposed. | Complete and verified. `npm run check` (247 unit, 10 Node, 14 Worker) and 50 journeys in both engines pass; inspect `docs/checkpoints/phase-11.md`. |
 | 2026-08-20 | Phase 10 | Mapped every acceptance criterion to its evidence, added journeys for the out-of-bounds return and a returning device, ran the dependency audit, secret scan and bundle inspection, proved deployed environment isolation, played a match over an emulated 200 ms link, ran the 30-minute soak, and wrote the operations, rollback, troubleshooting and balance documentation. Fixed five defects the checks exposed. | Automated part complete and deployed on schema v8. `npm run check` (232 unit, 10 Node, 14 Worker), 48 journeys in both engines, 20 read-only production checks, and a 30-minute soak with 320 clean recoveries all pass. Remaining: pair the two iPads and run the observed device journeys; see the note under Phase 10. |
 | 2026-08-20 | Phase 9 | Gave all six worlds their own validated geometry, added named lifts to the city with cooldown and safe arrival, added one-at-a-time Dutch hints that stop once a control is used, centralised and audited every Dutch label, added a pause cue, and ran automated accessibility and performance passes. | Complete and verified. `npm run check` (228 unit, 10 Node, 12 Worker) and 43 journeys in both engines pass; frame reports are in `docs/checkpoints/`. Restart at Phase 10's first unchecked task; inspect `docs/checkpoints/phase-09.md`. |
 | 2026-08-20 | Phase 8 hardening | Fixed three defects the winner journey exposed: a finished match was reported to nobody when its last tick fell between two snapshots, a tap shorter than one tick was dropped, and a control release that missed its button stayed held forever. Added regression tests for all three. | Complete and verified. `npm run check` (173 unit, 10 Node, 12 Worker), both browser engines, and the disconnect soak pass; the previously intermittent winner journey passed three consecutive chain runs. Restart at Phase 9's first unchecked task. |

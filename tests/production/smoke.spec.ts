@@ -94,8 +94,8 @@ test("the browser bundle carries no secret", async ({ request, page }) => {
 
 test("the prepared artwork is served", async ({ request }) => {
   const files = [
-    "/art/sprites/luca.png",
-    "/art/sprites/senna.png",
+    "/art/sprites/knight.png",
+    "/art/sprites/pirate.png",
     "/art/worlds/beach.png",
     "/art/icons/chest.png",
     "/art/icons/heart.png",
@@ -116,15 +116,17 @@ test("test mode plays a full match on the deployed build", async ({ page }) => {
   await expect(page.locator("#weapon-status")).toHaveText("Vuisten");
   await expect(page.locator("#effect-status")).toHaveText("Geen");
 
-  // The artwork actually reaches the canvas.
+  // The artwork actually reaches the canvas, and a player sheet really is a
+  // strip of four frames rather than a single drawing.
   const drawn = await page.evaluate(async () => {
     const image = new Image();
-    image.src = "/art/sprites/luca.png";
+    image.src = "/art/sprites/knight.png";
     await image.decode();
     return { width: image.naturalWidth, height: image.naturalHeight };
   });
-  expect(drawn.width).toBeGreaterThan(0);
   expect(drawn.height).toBeGreaterThan(0);
+  expect(drawn.width % 4).toBe(0);
+  expect(drawn.width / 4).toBeLessThan(drawn.height);
 
   // A sword takes two hearts off the training opponent.
   await page.getByLabel("Oefenpop").selectOption("follow");

@@ -45,6 +45,23 @@ npm run assets
 
 Dat script haalt de vlakke magenta achtergrond weg, snijdt het iconenblad in losse iconen, schaalt alles en schrijft het resultaat naar `public/art/`. Er zijn geen extra dependencies voor nodig en de stappen zijn gedekt door unittests. Ontbreekt of faalt een afbeelding, dan valt het spel terug op de eenvoudige vormen: de speelbaarheid en de botsingsvakken veranderen nooit mee.
 
+### Spelers
+
+Elk uiterlijk heeft zijn eigen spritesheet in `public/art/sprites/<uiterlijk>.png`: een strip van vier plaatjes naast elkaar, altijd in deze volgorde.
+
+| Plaatje | Wanneer je het ziet      |
+| ------- | ------------------------ |
+| 1       | Stilstaan                |
+| 2       | Stap met het ene been    |
+| 3       | Stap met het andere been |
+| 4       | Springen                 |
+
+Lopen wisselt af tussen stap, stilstaan, andere stap, stilstaan. Dat leest als een looppas met een plaatje minder, en hoe harder je loopt hoe sneller de stappen gaan. Zodra je van de grond bent, zie je het springplaatje.
+
+Beide kinderen spelen hetzelfde jongetje; wie wie is zie je aan de naam erboven en de gekleurde vlek onder de voeten. Kiezen jullie hetzelfde uiterlijk, dan zien jullie er dus hetzelfde uit. Dat mag: de naam en de kleur blijven verschillen.
+
+De vier poses komen als een blokje van 2x2 uit de Layer MCP (`assets/source/poses-<uiterlijk>.png`). Het script zoekt de poses op aan hun eigen omtrek in plaats van op een raster te vertrouwen, gooit de schaduw weg die het model er toch onder zet, schaalt alle vier met dezelfde factor en zet ze op dezelfde vloer. Daardoor blijft het jongetje precies even groot terwijl hij loopt.
+
 Geluid en muziek worden in de browser zelf gemaakt met de Web Audio API, omdat deze Layer-werkruimte geen audiomodel heeft. Er wordt niets gestart voordat de speler iets aanraakt of indrukt, en geluid en muziek hebben aparte knoppen die hun stand onthouden.
 
 ## Werelden en liften

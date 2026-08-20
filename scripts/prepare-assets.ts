@@ -1,8 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { COSMETICS } from "../src/game/content.js";
 import { ICON_SHEET, prepareSprite, sliceSheet } from "./asset-pipeline.js";
-import { cornerColour, resize } from "./image-ops.js";
+import { cornerColour, keyBackdrop, resize } from "./image-ops.js";
+import { buildSpriteSheet } from "./sprite-sheet.js";
 import { decodePng, encodePng, type Bitmap } from "./png.js";
 
 /**
@@ -30,8 +32,16 @@ const sheet = read("icons-sheet.png");
 const key = cornerColour(sheet);
 console.log(`Keying backdrop rgb(${key.r}, ${key.g}, ${key.b}).`);
 
-write("sprites/luca.png", prepareSprite(read("luca.png"), 384));
-write("sprites/senna.png", prepareSprite(read("senna.png"), 384));
+// One sheet per outfit, and both children use the same character: they are
+// both boys, and who is who is told by the name and the coloured pad under
+// their feet rather than by the drawing.
+for (const cosmetic of COSMETICS) {
+  const poses = read(`poses-${cosmetic.id}.png`);
+  write(
+    `sprites/${cosmetic.id}.png`,
+    buildSpriteSheet(keyBackdrop(poses, cornerColour(poses)), 320),
+  );
+}
 
 sliceSheet(sheet, 4, 4).forEach((cell, index) => {
   const name = ICON_SHEET[index];

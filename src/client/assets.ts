@@ -1,4 +1,4 @@
-import type { CosmeticId, ItemId, PlayerRole, WorldId } from "../game/types.js";
+import type { CosmeticId, ItemId, WorldId } from "../game/types.js";
 
 /**
  * Names of the prepared artwork under `public/art`. The files are produced
@@ -7,7 +7,7 @@ import type { CosmeticId, ItemId, PlayerRole, WorldId } from "../game/types.js";
  * drawing.
  */
 export type AssetName =
-  | `sprite:${PlayerRole}`
+  | `sprite:${CosmeticId}`
   | `world:${WorldId}`
   | `icon:${ItemId}`
   | `icon:cosmetic-${CosmeticId}`

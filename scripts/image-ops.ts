@@ -55,10 +55,15 @@ function distanceTo(bitmap: Bitmap, index: number, key: Colour): number {
  * magenta screen). Instead the backdrop is grown as a region: it starts from
  * pixels that are unmistakably the key colour and spreads only through
  * neighbours that also stay near the key colour, which the thick dark outlines
- * of the artwork stop. Growing from every strict seed
- * rather than only from the border also clears enclosed pockets such as the gap
- * between a character's legs. Surviving pixels that touch the removed region
- * are feathered and un-mixed, so no coloured fringe is left on the outline.
+ * of the artwork stop. Growing from every strict seed rather than only from the
+ * border also clears enclosed pockets such as the gap between a character's
+ * legs. A seed is either the key colour almost exactly or near it with backdrop
+ * all around, which is what keeps a red stripe on a pirate shirt: the stripe is
+ * neither exactly the backdrop colour nor surrounded by it. The backdrop also
+ * grows through its own shadow, because the soft ellipse a generator draws under
+ * a character is the key colour with the light turned down. Surviving pixels that
+ * touch the removed region are feathered and un-mixed, so no coloured fringe is
+ * left on the outline.
  */
 export function keyBackdrop(
   bitmap: Bitmap,
@@ -66,17 +71,84 @@ export function keyBackdrop(
   tolerance = 62,
   feather = 74,
   strict = 34,
+  seedRadius = 3,
+  exact = 12,
+  shade = 26,
 ): Bitmap {
   const count = bitmap.width * bitmap.height;
   const removed = new Uint8Array(count);
   const queue: number[] = [];
+  /**
+   * A pixel the backdrop can be grown from: either it is the key colour almost
+   * exactly, which is what an enclosed pocket of backdrop looks like however
+   * small it is, or it is near the key colour with backdrop all around it,
+   * which is what the open backdrop looks like even where it shades off. Thin
+   * artwork in a similar colour, such as a red stripe on a pirate shirt, is
+   * neither.
+   */
+  const isSeed = (index: number): boolean => {
+    const distance = distanceTo(bitmap, index, key);
+    if (distance <= exact) return true;
+    if (distance > strict) return false;
+    const x = index % bitmap.width;
+    const y = (index - x) / bitmap.width;
+    for (const [stepX, stepY] of [
+      [seedRadius, 0],
+      [-seedRadius, 0],
+      [0, seedRadius],
+      [0, -seedRadius],
+    ] as const) {
+      const nextX = x + stepX;
+      const nextY = y + stepY;
+      // Outside the image counts as backdrop: the border is backdrop by
+      // definition, and a generated pose never touches the edge.
+      if (
+        nextX < 0 ||
+        nextY < 0 ||
+        nextX >= bitmap.width ||
+        nextY >= bitmap.height
+      ) {
+        continue;
+      }
+      if (distanceTo(bitmap, nextY * bitmap.width + nextX, key) > strict) {
+        return false;
+      }
+    }
+    return true;
+  };
   for (let index = 0; index < count; index += 1) {
-    if (distanceTo(bitmap, index, key) > strict) continue;
+    if (!isSeed(index)) continue;
     removed[index] = 1;
     queue.push(index);
   }
+  /**
+   * True for a pixel that is the key colour with the light turned down: the
+   * soft drop shadow a generator draws under a character even when the prompt
+   * asked it not to. It is only ever removed by growing into it from the
+   * backdrop, so a shadow that lies under a boot goes and the boot stays.
+   */
+  const isShadedKey = (index: number): boolean => {
+    const offset = index * 4;
+    const red = bitmap.data[offset]!;
+    const green = bitmap.data[offset + 1]!;
+    const blue = bitmap.data[offset + 2]!;
+    const keySquared = key.r * key.r + key.g * key.g + key.b * key.b;
+    if (keySquared === 0) return false;
+    const scale = (red * key.r + green * key.g + blue * key.b) / keySquared;
+    if (scale < 0.3 || scale > 1.02) return false;
+    return (
+      Math.sqrt(
+        (red - key.r * scale) ** 2 +
+          (green - key.g * scale) ** 2 +
+          (blue - key.b * scale) ** 2,
+      ) <= shade
+    );
+  };
   const grow = (index: number): void => {
-    if (removed[index] || distanceTo(bitmap, index, key) > tolerance) return;
+    if (removed[index]) return;
+    if (distanceTo(bitmap, index, key) > tolerance && !isShadedKey(index)) {
+      return;
+    }
     removed[index] = 1;
     queue.push(index);
   };

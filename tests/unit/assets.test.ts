@@ -32,9 +32,9 @@ describe("image library", () => {
   it("resolves each asset name to its prepared file", () => {
     const loader = fakeLoader();
     const library = new ImageLibrary(loader.load);
-    library.request("sprite:luca", "world:beach", "icon:sword");
+    library.request("sprite:knight", "world:beach", "icon:sword");
     expect([...loader.images.keys()]).toEqual([
-      "/art/sprites/luca.png",
+      "/art/sprites/knight.png",
       "/art/worlds/beach.png",
       "/art/icons/sword.png",
     ]);
@@ -43,13 +43,13 @@ describe("image library", () => {
   it("returns nothing until an image has loaded", () => {
     const loader = fakeLoader();
     const library = new ImageLibrary(loader.load);
-    expect(library.get("sprite:senna")).toBeNull();
+    expect(library.get("sprite:pirate")).toBeNull();
     expect(library.loadedCount).toBe(0);
-    for (const listener of loader.images.get("/art/sprites/senna.png")!
+    for (const listener of loader.images.get("/art/sprites/pirate.png")!
       .listeners) {
       listener();
     }
-    expect(library.get("sprite:senna")).not.toBeNull();
+    expect(library.get("sprite:pirate")).not.toBeNull();
     expect(library.loadedCount).toBe(1);
   });
 

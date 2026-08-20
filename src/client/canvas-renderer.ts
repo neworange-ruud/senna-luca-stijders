@@ -1,4 +1,4 @@
-import { arenaForWorld, WORLDS } from "../game/content.js";
+import { arenaForWorld, COSMETICS, WORLDS } from "../game/content.js";
 import { cameraTarget, followCamera, type Camera } from "../game/camera.js";
 import { CHESTS } from "../game/config.js";
 import { CHEST_LABELS } from "../game/content.js";
@@ -20,6 +20,7 @@ import {
   interpolatePlayer,
   LocalMovementPrediction,
 } from "./movement-presentation.js";
+import { frameIndexFor, frameRectangle } from "./sprite-animation.js";
 
 const FRAME_MILLISECONDS = 1_000 / 30;
 const EFFECT_MILLISECONDS = 420;
@@ -67,8 +68,7 @@ export class CanvasRenderer {
     this.arena = arena;
     this.prediction = new LocalMovementPrediction(role, this.arena);
     this.images.request(
-      "sprite:luca",
-      "sprite:senna",
+      ...COSMETICS.map((cosmetic) => `sprite:${cosmetic.id}` as const),
       "icon:sword",
       "icon:weak-sword",
       "icon:nerf",
@@ -232,7 +232,7 @@ export class CanvasRenderer {
       const camouflaged =
         role !== this.role && hasEffect(fighter, "camouflage");
       context.globalAlpha = camouflaged ? 0.45 : 1;
-      this.drawFighter(context, fighter, snapshot);
+      this.drawFighter(context, fighter, snapshot, now);
       context.globalAlpha = 1;
     }
     this.drawEffects(context, now);
@@ -378,6 +378,7 @@ export class CanvasRenderer {
     context: CanvasRenderingContext2D,
     fighter: PlayerState,
     snapshot: GameSnapshot,
+    now: number,
   ): void {
     const box = { ...fighter.position, ...fighter.size };
     const colour = ROLE_COLOURS[fighter.role];
@@ -399,9 +400,14 @@ export class CanvasRenderer {
     context.fill();
     context.globalAlpha = 1;
 
-    const sprite = this.images.get(`sprite:${fighter.role}`);
-    if (sprite) {
-      const target = spriteRectangle(box, sprite);
+    // The sheet belongs to the outfit this child picked, and both children use
+    // the same character, so who is who is told by the name and the pad.
+    const sheet = fighter.cosmetic
+      ? this.images.get(`sprite:${fighter.cosmetic}`)
+      : null;
+    if (sheet) {
+      const frame = frameRectangle(sheet, frameIndexFor(fighter, now));
+      const target = spriteRectangle(box, frame);
       context.save();
       if (fighter.facing === "left") {
         context.translate(target.x + target.width / 2, 0);
@@ -413,7 +419,11 @@ export class CanvasRenderer {
         context.translate(0, target.height * 0.06);
       }
       context.drawImage(
-        sprite,
+        sheet,
+        frame.x,
+        frame.y,
+        frame.width,
+        frame.height,
         target.x,
         target.y,
         target.width,
@@ -463,7 +473,9 @@ export class CanvasRenderer {
       }
     }
 
-    this.drawCosmetic(context, fighter);
+    // The outfit is drawn on the character itself, so the badge above the head
+    // is only needed while the artwork has not arrived.
+    if (!sheet) this.drawCosmetic(context, fighter);
     // Active powers ride above both fighters, so each player can see what the
     // other one picked up and not only what they hold themselves.
     fighter.effects.forEach((effect, index) => {
