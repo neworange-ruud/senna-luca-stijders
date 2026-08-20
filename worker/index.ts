@@ -488,7 +488,15 @@ export class GameRoom {
     if (speaker) {
       this.lastHeardAt[speaker] = Date.now();
       if (!this.state.match.players[speaker].connected) {
+        // A player who was written off as offline is back. Nothing else
+        // publishes a change that happens between two ticks, and a frozen match
+        // does not tick, so the other player would keep waiting for somebody
+        // the room can already hear.
         setPlayerConnected(this.state, speaker, true);
+        await this.persist();
+        this.broadcast(this.snapshotMessage());
+        this.broadcastPresence();
+        this.ensureSimulationLoop();
       }
     }
     if (typeof message !== "string" || message.length > MAX_MESSAGE_BYTES) {

@@ -9,7 +9,7 @@ This is the durable execution record for implementing [`PRD.md`](./PRD.md). It i
 - Current phase: Phase 10 - Final headless acceptance, deployment, and physical release
 - Implementation progress: 10 of 11 phases complete
 - Current blocker: None for the automated part of Phase 10. Two items need the physical devices: the exact target iPad model identifiers, and the unassisted first-use and frame-rate measurements on them.
-- Next action: Start Phase 10 at the acceptance-criterion mapping, then the security and dependency audit. Deploy the schema v7 Worker before the matching frontend.
+- Next action: Phase 10 in progress. Continue at the acceptance-criterion mapping, then the security and dependency audit. Deploy the schema v7 Worker before the matching frontend.
 
 Status values used below:
 
@@ -395,7 +395,7 @@ Verification:
 
 Checkpoint: a six-world selector/gallery, accessibility report, and performance report in `docs/checkpoints/phase-09.md`.
 
-### [ ] Phase 10 - Final Headless Acceptance, Deployment, And Physical Release
+### [~] Phase 10 - Final Headless Acceptance, Deployment, And Physical Release
 
 Goal: verify the whole product, deploy isolated environments, and leave an operable release.
 
@@ -450,20 +450,20 @@ Update Status only after the required evidence is linked from Verification Evide
 
 | PRD acceptance criterion | Primary phases | Required evidence | Status |
 | --- | --- | --- | --- |
-| 1. Luca and Senna join one match | 2, 3, 4 | Dual-role integration and E2E journey | Pending |
-| 2. Unauthorized role use is rejected | 3, 10 | Three-context security suite and forged-command tests | Pending |
-| 3. Cosmetic/world selection and ready | 4 | Lobby state tests and two-client screenshot | Pending |
+| 1. Luca and Senna join one match | 2, 3, 4 | Dual-role integration and E2E journey | Passed: two roles share one room in `tests/worker/realtime-worker.test.ts`, and every dual-client journey (`duel`, `chests`, `lifecycle`, `worlds`, `acceptance`) plays one match from two isolated browser contexts |
+| 2. Unauthorized role use is rejected | 3, 10 | Three-context security suite and forged-command tests | Passed: `tests/e2e/pairing-security.spec.ts` (replacement disconnects the old device, attacker cannot pair), forged role and flooded commands rejected in `tests/worker/realtime-worker.test.ts`, and `tests/production/isolation.spec.ts` proves the deployed room refuses unsigned sockets, unsigned internal calls, and every debug route |
+| 3. Cosmetic/world selection and ready | 4 | Lobby state tests and two-client screenshot | Passed: `tests/unit/lifecycle.test.ts` and `tests/e2e/lobby.spec.ts` cover chooser, confirmation, appearance, and both-ready; `tests/e2e/worlds.spec.ts` proves the chosen world decides the geometry; screenshots in `docs/checkpoints/` |
 | 4. Start with 10 hearts and no weapons | 1, 4, 6 | Match initialization unit and E2E assertions | Passed: `tests/unit/combat.test.ts`, `tests/e2e/practice.spec.ts` assert ten hearts and bare fists at match start |
 | 5. Move, jump, attack, block, evade | 5, 6 | Gameplay unit suite and scripted duel | Passed: movement, combat, and invariant suites plus the dual-client duel journey |
 | 6. Chests spawn and have one claimant | 7 | Race/invariant tests and item E2E journey | Passed: `tests/unit/chests.test.ts`, simultaneous-claim Worker test, and `tests/e2e/chests.spec.ts` |
 | 7. Sword, throw, Nerf, weapon switch | 6 | Per-weapon unit tests and duel trace | Passed: `docs/checkpoints/phase-06.md` fixture hash and `tests/e2e/duel.spec.ts` |
 | 8. Shared authoritative hearts | 2, 6 | Forged-hit rejection and convergent snapshots | Passed: forged input rejected and cadence enforced in `tests/worker/realtime-worker.test.ts`; both clients agree on every heart change in `tests/e2e/duel.spec.ts` |
-| 9. Safe no-damage out-of-bounds return | 1, 5 | Respawn unit and browser journey | Pending |
+| 9. Safe no-damage out-of-bounds return | 1, 5 | Respawn unit and browser journey | Passed: `tests/unit/movement.test.ts` returns an out-of-bounds player with the same hearts and 45 protected ticks; `tests/e2e/acceptance.spec.ts` walks a child into the space-planet pit, and both browsers still show ten hearts, visible protection, and protection that runs out by itself (`docs/checkpoints/phase-10-respawn.png`) |
 | 10. Pause/reconnect gives no advantage | 8 | Frozen-clock tests and offline Playwright trace | Passed: frozen clocks and symmetric freeze in `tests/unit/lifecycle.test.ts`, plus the offline journey in `tests/e2e/lifecycle.spec.ts` |
 | 11. Zero hearts and clean rematch | 6, 8 | Finish/reset invariants and full journey | Passed: exhaustive reset invariants and the winner journey with rematch consent |
-| 12. Dutch child-understandable experience | 4, 9, 10 | Catalog/tutorial automation, unassisted Luca/Senna observation, and returning-device start within 2 minutes | Pending |
-| 13. Two iPads play production URL | 10 | Physical device release report | Pending |
-| 14. Critical automation exists | All | `npm run check`, E2E reports, CI | Pending |
+| 12. Dutch child-understandable experience | 4, 9, 10 | Catalog/tutorial automation, unassisted Luca/Senna observation, and returning-device start within 2 minutes | Automated part passed: `tests/unit/dutch.test.ts` proves every phase, event, outcome, weapon, effect, chest, world, and appearance has a Dutch name and that no English is left in the pages; `tests/unit/hints.test.ts` and `tests/e2e/worlds.spec.ts` cover the one-at-a-time tutorial; `tests/e2e/acceptance.spec.ts` measures a returning device back in play in 4.9 s (Chromium) and 8.0 s (WebKit) against a 120 s budget. Open: the unassisted observation with Luca and Senna themselves |
+| 13. Two iPads play production URL | 10 | Physical device release report | Open: needs the two physical iPads. The deployment itself is verified: production runs schema v7, `npm run test:production` passes 20 read-only checks in both engines, and a paired two-device journey was played end to end on the deployment during the release check |
+| 14. Critical automation exists | All | `npm run check`, E2E reports, CI | Passed: `npm run check` runs 228 unit, 10 Node integration, and 12 Worker integration tests with formatting, typed lint, three TypeScript runtimes, and the build; `npx playwright test` runs 47 journeys in Chromium and WebKit; `npm run test:production` runs 20 read-only checks against the deployment; GitHub Actions runs the same gates on every push |
 
 ## Risk Register
 
@@ -483,6 +483,9 @@ Update Status only after the required evidence is linked from Verification Evide
 
 | Date | Decision | Reason |
 | --- | --- | --- |
+| 2026-08-20 | A player who was written off as offline is published the moment the room hears them again. | A frozen match does not tick, and nothing else broadcast a change made between two ticks. The room could be perfectly healthy while the other child kept staring at "Even wachten" with a disabled button, which is exactly the situation the freeze is supposed to end. |
+| 2026-08-20 | While a match is frozen the browser proves its connection with a ping instead of an input command. | Controls are refused outside play, and a refused command is not a heartbeat: it would report the connection as broken four times a second. |
+| 2026-08-20 | A pause a child asked for keeps saying so until it actually happens. | The next snapshot still says the match is running, so it used to put the button back to "Pauze" and the tap looked ignored. |
 | 2026-08-20 | Every world has its own arena file, and the arena is derived from the world the match is playing. | Six worlds that all played on the beach geometry were six names for one world. Deriving the arena instead of storing it means a checkpoint can never disagree with the world it says it is in. |
 | 2026-08-20 | Reachability treats a teleport as a way to travel. | A rooftop that only a lift can reach would otherwise be reported unreachable, and the city would have had to be flattened into another beach. |
 | 2026-08-20 | A teleport leads to exactly one other teleport, and both ends carry the same name on screen. | A list of destinations needs a menu in the middle of a fight. A named pair shows a seven-year-old where the lift goes without reading anything. |
@@ -525,6 +528,22 @@ Append concise entries as work is verified. Do not replace prior evidence.
 
 | Date | Phase | Command or check | Result | Evidence |
 | --- | --- | --- | --- | --- |
+| 2026-08-20 | Phase 10 | `SOAK_MINUTES=30 npx playwright test tests/e2e/soak.spec.ts` | Passed: 320 disconnect cycles, 320 convergence checks, no problems, both clients ending on tick 39369 | `docs/checkpoints/phase-10.md` |
+| 2026-08-20 | Phase 10 | Match over an emulated 200 ms connection | Passed: both pages still agree on where everybody is | `tests/e2e/network.spec.ts` |
+| 2026-08-20 | Phase 10 | `npm run test:integration:worker` before and after the restored-connection fix | The new test times out against the old code and passes against the fixed code | `tests/worker/realtime-worker.test.ts` |
+| 2026-08-20 | Phase 10 | `npx playwright test` | 48 journeys passed in Chromium and WebKit, 2 documented skips | Playwright report |
+| 2026-08-20 | Phase 8 | `npm run test:integration:worker` before and after the phase-change broadcast fix | The odd-tick finish test times out against the old code and passes against the fixed code | `tests/worker/realtime-worker.test.ts` |
+| 2026-08-20 | Phase 8 | Winner journey repeated three times in the chain that reproduced the flake | Passed 3 of 3 after the fix, having failed 2 of 3 before it | `tests/e2e/lifecycle.spec.ts` |
+| 2026-08-20 | Phase 9 | `npm run check` | Passed with 228 unit, 10 Node, and 12 Worker tests | `docs/checkpoints/phase-09.md` |
+| 2026-08-20 | Phase 9 | `npx playwright test` | 43 journeys passed in Chromium and WebKit, 1 documented skip | `docs/checkpoints/phase-09.md` |
+| 2026-08-20 | Phase 9 | Automated accessibility audit | Passed: every control at least 44 by 44 pixels with a name, every text pair at 4.5:1 or better from computed styles, keyboard reachable setup, arena described in text, gestures blocked, portrait message, reduced-motion match | `tests/e2e/accessibility.spec.ts` |
+| 2026-08-20 | Phase 9 | Frame trace in the busiest world | Chromium 58.4 fps, 16.7 ms median, 0.24 ms game work per frame, no heap growth; WebKit 0.32 ms game work per frame with software rasterisation explained | `docs/checkpoints/phase-09-performance-chromium.json`, `docs/checkpoints/phase-09-performance-webkit.json` |
+| 2026-08-20 | Phase 10 | `npm audit` and `npm audit --omit=dev` | 0 vulnerabilities; one runtime dependency (`@upstash/redis`) | Command output |
+| 2026-08-20 | Phase 10 | Secret scan of tracked files and of the built bundle | No key material, no secret assignments, and no environment URLs in `dist/` | `git grep` patterns and `dist/assets/*.js` |
+| 2026-08-20 | Phase 10 | `npm run test:production` | 20 read-only checks passed in both engines against the live deployment | `tests/production/` |
+| 2026-08-20 | Phase 10 | Deployed environment isolation | Preview and production answer as separate environments on separate hosts with matching protocol and schema; the production room refuses unsigned sockets, unsigned and wrongly signed internal calls, and every debug route; pairing is refused before the pin is read for a missing or foreign origin | `tests/production/isolation.spec.ts` |
+| 2026-08-20 | Phase 10 | Out-of-bounds return journey | Passed in both engines: ten hearts before and after, protection shown and expiring by itself | `tests/e2e/acceptance.spec.ts`, `docs/checkpoints/phase-10-respawn.png` |
+| 2026-08-20 | Phase 10 | Returning-device start | Passed: back in play in 4.9 s (Chromium) and 8.0 s (WebKit) against the 120 s requirement | `tests/e2e/acceptance.spec.ts` |
 | 2026-08-19 | Planning | PRD and foundation inspection | Plan created; implementation not started | `docs/PLAN.md` |
 | 2026-08-19 | Planning | Independent PRD coverage and contradiction audit | Passed after revisions; no unresolved actionable findings | P0 coverage, acceptance traceability, and phase gates in this document |
 | 2026-08-19 | Planning | `git diff --check` | Passed | `AGENTS.md`, `docs/PLAN.md` |

@@ -30,6 +30,8 @@ export interface MatchSession {
   start(): void;
   stop(): void;
   send(command: GameCommand): boolean;
+  /** Proves this side is still connected without sending a game command. */
+  ping(): boolean;
   onSnapshot(listener: (snapshot: GameSnapshot) => void): () => void;
   onError(listener: (error: SessionError) => void): () => void;
   onMetrics(listener: (metrics: TransportMetrics) => void): () => void;

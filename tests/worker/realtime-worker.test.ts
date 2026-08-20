@@ -10,7 +10,10 @@ interface ProtocolMessage {
   snapshot?: {
     state: {
       lobby: { selectedWorld: string | null };
-      match: { phase: string };
+      match: {
+        phase: string;
+        players?: Record<string, { connected: boolean } | undefined>;
+      };
     };
   };
 }
@@ -20,12 +23,14 @@ interface RoomState {
   match: {
     phase: string;
     tick: number;
+    pauseReason?: string | null;
     chests: { position: { x: number; y: number } }[];
     chestSchedule: { nextAnnouncementTick: number };
     players: Record<
       "luca" | "senna",
       {
         health: number;
+        connected: boolean;
         attackQueued: boolean;
         nextAttackTick: number;
         input: { attack: boolean };
@@ -451,6 +456,41 @@ describe("realtime Worker", () => {
       senna.close();
     },
   );
+
+  it("tells the other player when a written-off connection answers again", async () => {
+    const bindings = env as unknown as { GAME_ROOMS: DurableObjectNamespace };
+    const stub = bindings.GAME_ROOMS.getByName("development:main");
+    const luca = await connect("luca");
+    const senna = await connect("senna");
+    await stub.fetch("https://room.internal/debug/start-playing", {
+      method: "POST",
+    });
+
+    // The room decides Senna is gone. A frozen match does not tick, so nothing
+    // else is going to publish her return.
+    await runInDurableObject(stub, (instance: GameRoom) => {
+      const room = instance as unknown as {
+        state: RoomState;
+        lastHeardAt: Record<"luca" | "senna", number>;
+      };
+      room.state.match.players.senna.connected = false;
+      room.state.match.phase = "paused";
+      room.state.match.pauseReason = "connection";
+      room.lastHeardAt.senna = 1;
+    });
+
+    const restored = nextMessage(
+      luca,
+      (message) =>
+        message.snapshot?.state.match.players?.senna?.connected === true,
+    );
+    // Senna's browser proves the connection with a ping, not a game command.
+    senna.send(JSON.stringify({ type: "ping", clientTime: 1 }));
+    await expect(restored).resolves.toBeDefined();
+
+    luca.close();
+    senna.close();
+  });
 
   it("tells both players about a match that ends between two snapshots", async () => {
     const bindings = env as unknown as { GAME_ROOMS: DurableObjectNamespace };

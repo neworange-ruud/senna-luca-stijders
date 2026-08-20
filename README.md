@@ -135,3 +135,83 @@ Coverage voor de pure spelregels wordt geschreven naar `coverage/unit/` via:
 ```sh
 npm run test:unit:coverage
 ```
+
+## Een apparaat koppelen, vervangen of afmelden
+
+Koppelen doet een volwassene eenmalig per iPad:
+
+1. Open de productie-URL op de iPad.
+2. Kies Luca of Senna.
+3. Vul de `ADMIN_PIN` in en druk op **Dit apparaat koppelen**.
+
+Het apparaat bewaart daarna een eigen sleutel in een HttpOnly-cookie. De kinderen hoeven de pincode nooit te weten en na een herstart is het apparaat binnen enkele seconden weer klaar om te spelen.
+
+Gaat een iPad kapot of wordt hij vervangen, koppel dan het nieuwe apparaat voor diezelfde speler en zet **Dit apparaat vervangen** aan. De oude sleutel vervalt op dat moment: die iPad wordt uit de wedstrijd gezet en kan niet meer meespelen tot hij opnieuw gekoppeld wordt.
+
+Wil je alle apparaten in één keer afmelden, verander dan `ADMIN_PIN`, `SESSION_SIGNING_SECRET` of `WORKER_INTERNAL_SECRET` in Vercel en deploy opnieuw. Alle bestaande sessies vervallen dan meteen.
+
+## Terugdraaien en opnieuw beginnen
+
+De Worker en de frontend worden apart teruggedraaid, en altijd in deze volgorde: eerst de frontend naar de vorige versie, daarna de Worker.
+
+```sh
+npx vercel rollback <deployment-url>                        # frontend terug
+npx wrangler rollback --env production                      # Worker terug
+```
+
+Een wedstrijd wordt bewaard met een schemanummer. Draait de Worker een nieuwer schema dan de bewaarde wedstrijd, dan gooit hij die wedstrijd weg en begint met een lege lobby; de gekoppelde apparaten blijven wel gekoppeld. Dat is bedoeld: een half ingelezen wedstrijd zou harten of kisten kunnen verzinnen. Voor de kinderen betekent het dat ze na een update opnieuw een wereld kiezen.
+
+Een vastgelopen wedstrijd los je op door beide iPads te verversen. Helpt dat niet, deploy de Worker dan opnieuw: de kamer start dan leeg op.
+
+## Als iets niet werkt
+
+| Wat je ziet                          | Wat het betekent                                                | Wat je doet                                                                       |
+| ------------------------------------ | --------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| "Nog niet gekoppeld"                 | Dit apparaat heeft geen sleutel (of de secrets zijn veranderd). | Koppel het apparaat opnieuw met de pincode.                                       |
+| "De beheerpincode klopt niet."       | Verkeerde pincode, of `ADMIN_PIN` staat niet in Vercel.         | Controleer `ADMIN_PIN` in de Vercel-omgeving en deploy opnieuw.                   |
+| "Te veel pogingen."                  | Vijf pogingen binnen een minuut vanaf hetzelfde netwerk.        | Wacht een minuut.                                                                 |
+| "Verbinding herstellen" blijft staan | De iPad krijgt geen WebSocket naar de Worker.                   | Controleer `REALTIME_URL` en of de Worker `/health` antwoordt.                    |
+| "Even wachten op de ander"           | De andere speler is weg of heeft een slechte verbinding.        | Wacht, of ververs de andere iPad.                                                 |
+| "Het spel loopt niet gelijk"         | De pagina is ouder of nieuwer dan de server.                    | Druk op **Spel opnieuw laden**; deploy anders eerst de Worker en dan de frontend. |
+| Alles staat stil in beide iPads      | De wedstrijd is bevroren omdat één verbinding stil is.          | Wacht tot de verbinding terug is; beide spelers moeten daarna op klaar drukken.   |
+
+Snel controleren of een omgeving gezond is:
+
+```sh
+curl https://<worker-host>/health     # omgeving, protocolVersion, schemaVersion
+curl https://<app-host>/api/health    # status en apiVersion
+```
+
+Beide moeten hetzelfde `protocolVersion` melden als de frontend die je gedeployd hebt.
+
+## Bekende beperkingen en spelwaarden
+
+Wat versie 1 bewust niet doet:
+
+- Er zijn precies twee spelers: Luca en Senna. Er is geen derde plek, geen publiek en geen toernooi.
+- Liften staan alleen in de stad. De andere vijf werelden hebben ze niet nodig.
+- Muziek is een eenvoudig loopje dat in de browser zelf gemaakt wordt, omdat er geen audiomodel beschikbaar was. Geluid is nooit nodig om te weten wat er gebeurt: alles staat ook in beeld en in tekst.
+- Een wedstrijd wordt niet bewaard over een update heen. Draait de Worker een nieuwer schema, dan begint de kamer leeg; de koppeling van de iPads blijft wel staan.
+- De verbinding bevriest de wedstrijd voor beide spelers zodra één kant stil valt. Dat is opzet: anders zou een slechte verbinding een voordeel worden.
+- Er is geen scherm om waardes aan te passen. De spelwaardes staan in `src/game/config.ts` en veranderen alleen door een nieuwe deploy.
+
+De spelwaardes zoals ze nu staan:
+
+| Wat                    | Waarde                                                              |
+| ---------------------- | ------------------------------------------------------------------- |
+| Simulatie              | 30 ticks per seconde, 15 snapshots per seconde                      |
+| Harten                 | 10 per speler                                                       |
+| Rennen                 | 360 eenheden per seconde, 1,25 keer zo snel met Snelheid            |
+| Springen               | impuls 760, zwaartekracht 1900 (springt ongeveer 152 eenheden hoog) |
+| Vuisten                | bereik 48, 1 schade, 700 ms tussen slagen                           |
+| Zwaard                 | bereik 90, 2 schade, 650 ms                                         |
+| Klein zwaard           | bereik 64, 1 schade, 500 ms                                         |
+| Blaster                | 6 pijltjes, 1 schade, 450 ms                                        |
+| Zwaard gooien          | 500 ms opladen, komt na 8 seconden terug bij de eigenaar            |
+| Blokkeren              | 1 schade minder van voren, 40 procent langzamer lopen               |
+| Kisten                 | eerste na 8 seconden, daarna elke 12 seconden, maximaal 2 tegelijk  |
+| Inhaalkist             | elke derde kist terwijl iemand 3 harten of meer achterstaat         |
+| Schild                 | houdt 3 schade tegen                                                |
+| Camouflage en Snelheid | 8 seconden                                                          |
+| Lift                   | 1,5 seconde wachten voor dezelfde speler opnieuw mag                |
+| Veilig na terugkomen   | 1,5 seconde                                                         |

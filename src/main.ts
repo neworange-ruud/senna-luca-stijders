@@ -119,6 +119,12 @@ function setConnection(state: string, label: string): void {
 }
 
 let soundedPhase: MatchPhase | null = null;
+/**
+ * Set while a pause has been asked for but has not taken effect yet. Without
+ * it the next snapshot, which still says the match is running, would put the
+ * button back to "Pauze" and the child would think the tap did nothing.
+ */
+let pauseRequested = false;
 
 /**
  * Pausing and counting down are phases rather than events, so their sound is
@@ -203,9 +209,7 @@ function attachSession(role: PlayerRole, session: MatchSession): void {
     renderLobby(snapshot);
     // Background pages get their timers throttled, so the heartbeat also rides
     // on incoming snapshots: those are network events and keep arriving.
-    if (isPlaying() && Date.now() - lastInputSentAt >= HEARTBEAT_INTERVAL_MS) {
-      sendInput();
-    }
+    if (Date.now() - lastInputSentAt >= HEARTBEAT_INTERVAL_MS) beat();
     const update = renderer?.update(snapshot);
     qualityStatus.dataset.correction = `${Math.round(
       update?.correctionPixels ?? 0,
@@ -213,6 +217,9 @@ function attachSession(role: PlayerRole, session: MatchSession): void {
     if (update) audio.playEvents(update.events);
   });
   realtime.onError((error) => {
+    // A refused pause has to release the button, or the child is left looking
+    // at a request that is never going to happen.
+    pauseRequested = false;
     setConnection("offline", error.message);
   });
   realtime.start();
@@ -504,8 +511,9 @@ function renderLobby(snapshot: GameSnapshot): void {
   worldStatus.textContent = world.label;
   renderHint(snapshot);
   protectionStatus.hidden = own.invulnerableUntilTick <= snapshot.tick;
-  pauseButton.disabled = match.phase !== "playing";
-  pauseButton.textContent = "Pauze";
+  if (match.phase !== "playing") pauseRequested = false;
+  pauseButton.disabled = match.phase !== "playing" || pauseRequested;
+  pauseButton.textContent = pauseRequested ? "Pauze aanvragen..." : "Pauze";
   const canChooseAppearance = ["world-selection", "ready"].includes(
     match.phase,
   );
@@ -604,9 +612,11 @@ readyButton.addEventListener("click", () => {
 
 pauseButton.addEventListener("click", () => {
   markUsed("pause");
+  pauseRequested = true;
   pauseButton.disabled = true;
   pauseButton.textContent = "Pauze aanvragen...";
   if (sendCommand({ type: "pause" }) === null) {
+    pauseRequested = false;
     pauseButton.disabled = false;
     pauseButton.textContent = "Pauze";
   }
@@ -641,6 +651,38 @@ renderSoundControls();
 
 function isPlaying(): boolean {
   return activeSnapshot?.state.match.phase === "playing";
+}
+
+/**
+ * Proves to the room that this browser is still there. While a match runs that
+ * is the held controls; while it is frozen a ping does the same job, because
+ * controls are refused outside play and a refused command is not a heartbeat.
+ */
+function beat(): void {
+  if (isPlaying()) {
+    sendInput();
+    return;
+  }
+  if (inMatch()) {
+    lastInputSentAt = Date.now();
+    realtime?.ping();
+  }
+}
+
+/**
+ * True while this browser still has to prove its connection. A pause does not
+ * end that duty: the room only lets a frozen match continue once both sides are
+ * heard from again, and a page that went quiet while paused would look like a
+ * failing connection the moment play resumed.
+ */
+function inMatch(): boolean {
+  const phase = activeSnapshot?.state.match.phase;
+  return (
+    phase === "playing" ||
+    phase === "countdown" ||
+    phase === "paused" ||
+    phase === "reconnecting"
+  );
 }
 
 let jumpWasHeld = false;
@@ -693,9 +735,7 @@ function renderControlFeedback(): void {
 
 // The server treats silence as a failing connection, so the held controls are
 // resent on a slow interval even when nothing changes. This is the heartbeat.
-setInterval(() => {
-  if (isPlaying()) sendInput();
-}, HEARTBEAT_INTERVAL_MS);
+setInterval(beat, HEARTBEAT_INTERVAL_MS);
 
 window.addEventListener("keydown", (event) => {
   if (!isPlaying() || event.repeat || !inputMapper.keyDown(event.code)) return;

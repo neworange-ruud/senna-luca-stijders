@@ -199,6 +199,19 @@ export class RealtimeClient implements MatchSession {
       this.emitError(message.error);
   }
 
+  /**
+   * Sends a ping outside the normal rhythm. The room counts any message as
+   * proof that this side is still there, so this is how a browser keeps its
+   * connection alive while a match is frozen and no controls may be sent.
+   */
+  ping(): boolean {
+    if (this.socket?.readyState !== WebSocket.OPEN) return false;
+    this.socket.send(
+      JSON.stringify({ type: "ping", clientTime: performance.now() }),
+    );
+    return true;
+  }
+
   private startPinging(): void {
     window.clearInterval(this.pingTimer);
     this.pingTimer = window.setInterval(() => {

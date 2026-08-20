@@ -80,6 +80,11 @@ export class PracticeSession implements MatchSession {
     this.updateMetrics({ state: "offline" });
   }
 
+  /** Practice runs in this browser, so there is no connection to prove. */
+  ping(): boolean {
+    return true;
+  }
+
   send(command: GameCommand): boolean {
     if (command.role !== this.role) return false;
     const player = this.state.match.players[command.role];
