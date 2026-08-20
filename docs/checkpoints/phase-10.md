@@ -72,7 +72,7 @@ exactly two players, no heart was outside its bounds, and no entity was
 duplicated. Both clients ended on the same tick, 39369. No problems were
 recorded.
 
-## Three defects the release checks found
+## Four defects the release checks found
 
 None of these were test problems.
 
@@ -87,6 +87,14 @@ None of these were test problems.
   slower than the three-quarters of a second the room treats as silence. A
   frozen match now keeps proving its connection with a ping four times a second,
   so a real recovery is noticed immediately.
+- A freeze caused by a stall demanded a ceremony to end. Three missed
+  heartbeats is three quarters of a second, which on a home network is a stall
+  rather than a player leaving, and both children had to press ready before the
+  match went on. A freeze that never reached the two-second absence rule now
+  resumes by itself through the normal countdown; one that did still waits for
+  both of them, because then somebody really was gone. This was found by a
+  Playwright run where taking a screenshot stalled the page long enough to
+  freeze the match.
 - A pause a child asked for stopped saying so as soon as the next snapshot
   arrived, because that snapshot still says the match is running. On a slow
   link the button went back to "Pauze" while nothing had happened yet, which

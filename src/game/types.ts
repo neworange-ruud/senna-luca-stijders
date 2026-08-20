@@ -1,4 +1,4 @@
-export const GAME_SCHEMA_VERSION = 7 as const;
+export const GAME_SCHEMA_VERSION = 8 as const;
 export const GAME_PROTOCOL_VERSION = 1 as const;
 
 export type PlayerRole = "luca" | "senna";
@@ -217,6 +217,12 @@ export interface MatchState {
    * the browser explains the two differently.
    */
   pauseReason: "player" | "connection" | null;
+  /**
+   * True once a connection freeze lasted long enough to call somebody absent.
+   * A freeze that never got that far heals itself, so a hiccup on the home wifi
+   * does not make two children press a button before they may play on.
+   */
+  pauseEscalated: boolean;
   winner: PlayerRole | null;
   arenaId: WorldId | null;
   randomState: number;

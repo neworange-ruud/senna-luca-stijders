@@ -161,6 +161,60 @@ describe("heartbeat staleness", () => {
     }
   });
 
+  it("carries on by itself after a stall that never became an absence", () => {
+    const state = playingMatch();
+    applyConnectionHealth(state, silence(0, HEARTBEAT_STALE_MS));
+    expect(state.match.phase).toBe("paused");
+    expect(state.match.pauseEscalated).toBe(false);
+
+    // The connection comes back well before anybody is called absent. Neither
+    // child should have to press a button after a one-second stall.
+    const health = applyConnectionHealth(state, silence(0, 0));
+    expect(health.resumed).toBe(true);
+    expect(health.changed).toBe(true);
+    expect(state.match.phase).toBe("countdown");
+    expect(state.match.resumeTarget).toBe("playing");
+    expect(state.match.pauseReason).toBeNull();
+    // The countdown still runs, so nobody is dropped straight into a fight.
+    expect(state.match.countdownEndsTick).toBe(state.match.tick + 90);
+    for (const role of ["luca", "senna"] as const) {
+      expect(state.match.players[role].ready).toBe(false);
+    }
+  });
+
+  it("waits for both children when somebody was really gone", () => {
+    const state = playingMatch();
+    applyConnectionHealth(state, silence(0, HEARTBEAT_STALE_MS));
+    applyConnectionHealth(state, silence(0, HEARTBEAT_OFFLINE_MS));
+    expect(state.match.pauseEscalated).toBe(true);
+
+    // Even once the absent player is back and answering, the match stays frozen
+    // until both of them say they are ready.
+    state.match.players.senna.connected = true;
+    const health = applyConnectionHealth(state, silence(0, 0));
+    expect(health.resumed).toBe(false);
+    expect(state.match.phase).toBe("paused");
+    expect(state.match.pauseReason).toBe("connection");
+  });
+
+  it("never resumes a pause a child asked for", () => {
+    const state = playingMatch();
+    expect(pauseMatch(state, "luca")).toBeNull();
+    expect(state.match.pauseReason).toBe("player");
+    const health = applyConnectionHealth(state, silence(0, 0));
+    expect(health.resumed).toBe(false);
+    expect(state.match.phase).toBe("paused");
+    expect(state.match.pausedBy).toBe("luca");
+  });
+
+  it("does not resume while one side is still quiet", () => {
+    const state = playingMatch();
+    applyConnectionHealth(state, silence(0, HEARTBEAT_STALE_MS));
+    const health = applyConnectionHealth(state, silence(0, HEARTBEAT_STALE_MS));
+    expect(health.resumed).toBe(false);
+    expect(state.match.phase).toBe("paused");
+  });
+
   it("does not report a role that never connected as stale", () => {
     const state = createInitialGameState(3);
     const health = applyConnectionHealth(

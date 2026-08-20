@@ -57,6 +57,7 @@ export function createInitialGameState(randomSeed = 1): GameState {
       resumeTarget: null,
       pausedBy: null,
       pauseReason: null,
+      pauseEscalated: false,
       winner: null,
       arenaId: null,
       randomState: randomSeed >>> 0,
@@ -205,6 +206,7 @@ export function advanceLifecycle(state: GameState, tick: number): void {
     state.match.resumeTarget = null;
     state.match.pausedBy = null;
     state.match.pauseReason = null;
+    state.match.pauseEscalated = false;
     for (const playerState of Object.values(state.match.players)) {
       playerState.ready = false;
     }
@@ -218,6 +220,7 @@ export function pauseMatch(
   if (state.match.phase !== "playing") return invalidPhase();
   state.match.pausedBy = role;
   state.match.pauseReason = "player";
+  state.match.pauseEscalated = false;
   state.match.resumeTarget = "playing";
   for (const playerState of Object.values(state.match.players)) {
     playerState.ready = false;

@@ -1,3 +1,4 @@
+import { COUNTDOWN_TICKS } from "./config.js";
 import { EMPTY_INPUT, type GameState, type PlayerRole } from "./types.js";
 
 /**
@@ -13,6 +14,8 @@ export const HEARTBEAT_OFFLINE_MS = 2_000;
 const ROLES: readonly PlayerRole[] = ["luca", "senna"];
 
 export interface ConnectionHealth {
+  /** True when this call started the countdown back into a frozen match. */
+  resumed: boolean;
   /** Roles whose heartbeat is late enough to freeze the match. */
   stale: readonly PlayerRole[];
   /** Roles quiet long enough to be shown as offline. */
@@ -48,7 +51,13 @@ export function applyConnectionHealth(
   // somebody asked for, nobody is expected to be sending controls, and a real
   // disconnect there is caught by the closing socket instead.
   if (!watchesHeartbeats(state)) {
-    return { stale: [], offline: [], paused: false, changed: false };
+    return {
+      stale: [],
+      offline: [],
+      paused: false,
+      resumed: false,
+      changed: false,
+    };
   }
   const stale = ROLES.filter(
     (role) =>
@@ -72,6 +81,9 @@ export function applyConnectionHealth(
     state.match.players[role].connected = false;
     state.match.players[role].ready = false;
   }
+  // Somebody was quiet long enough to be called absent, so this freeze is not a
+  // hiccup any more and the children decide together when to carry on.
+  if (newlyOffline.length > 0) state.match.pauseEscalated = true;
 
   const shouldPause = stale.length > 0 && state.match.phase === "playing";
   if (shouldPause) {
@@ -83,11 +95,33 @@ export function applyConnectionHealth(
     state.match.phaseStartedTick = state.match.tick;
     for (const role of ROLES) state.match.players[role].ready = false;
   }
+  // A freeze that never became an absence heals itself. The countdown still
+  // runs, so neither child is dropped straight back into a fight, but nobody
+  // has to press anything after a one-second stall on the wifi.
+  const frozenByConnection =
+    !shouldPause &&
+    state.match.phase === "paused" &&
+    state.match.pauseReason === "connection" &&
+    !state.match.pauseEscalated;
+  const everybodyBack =
+    stale.length === 0 &&
+    ROLES.every((role) => state.match.players[role].connected);
+  const resumed = frozenByConnection && everybodyBack;
+  if (resumed) {
+    state.match.countdownEndsTick = state.match.tick + COUNTDOWN_TICKS;
+    state.match.resumeTarget = "playing";
+    state.match.pauseReason = null;
+    state.match.pausedBy = null;
+    state.match.phase = "countdown";
+    state.match.phaseStartedTick = state.match.tick;
+    for (const role of ROLES) state.match.players[role].ready = false;
+  }
   return {
     stale,
     offline,
     paused: shouldPause,
-    changed: shouldPause || newlyOffline.length > 0,
+    resumed,
+    changed: shouldPause || resumed || newlyOffline.length > 0,
   };
 }
 

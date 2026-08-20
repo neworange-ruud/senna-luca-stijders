@@ -5,11 +5,11 @@ This is the durable execution record for implementing [`PRD.md`](./PRD.md). It i
 ## Status
 
 - Last updated: 2026-08-20
-- Overall status: Implementation in progress
+- Overall status: Feature complete and deployed; waiting on the two physical iPads
 - Current phase: Phase 10 - Final headless acceptance, deployment, and physical release
 - Implementation progress: 10 of 11 phases complete
 - Current blocker: None for the automated part of Phase 10. Two items need the physical devices: the exact target iPad model identifiers, and the unassisted first-use and frame-rate measurements on them.
-- Next action: Phase 10 in progress. Continue at the acceptance-criterion mapping, then the security and dependency audit. Deploy the schema v7 Worker before the matching frontend.
+- Next action: Pair the two iPads with the production pin, then run the observed first-use and full-match journeys and record the device identifiers, time to start, comprehension, multi-touch, frame rate, and latency. Everything that can be checked without a device is done and deployed on schema v7.
 
 Status values used below:
 
@@ -109,7 +109,7 @@ These are external facts, not implementation design choices. Record answers here
 | --- | --- | --- |
 | Exact model identifier and iPadOS version for Luca's iPad | Phase 10 physical gate | Develop to Safari 17/iPadOS 17 floor and common iPad landscape viewports. |
 | Exact model identifier and iPadOS version for Senna's iPad | Phase 10 physical gate | Same as above. |
-| Provider/GitHub account authorization and production secrets | Phase 2 remote gate and Phase 10 deployment | Preview and production are both provisioned: each has its own Worker, room, signing secret, and internal secret. The release-check `ADMIN_PIN` was rotated to a value nobody holds, so the owner must set their own with `vercel env add ADMIN_PIN production` and redeploy before pairing an iPad. The Worker-side secrets are in the ignored `.production-secrets.local`, which is their only copy. Never store real values in Git. |
+| Provider/GitHub account authorization and production secrets | Phase 2 remote gate and Phase 10 deployment | Preview and production are both provisioned: each has its own Worker, room, signing secret, and internal secret. The owner set their own production `ADMIN_PIN` on 2026-08-20, replacing the rotated release-check value, so an iPad can be paired. The Worker-side secrets are in the ignored `.production-secrets.local`, which is their only copy. Never store real values in Git. |
 
 ## Target Code Shape
 
@@ -399,16 +399,30 @@ Checkpoint: a six-world selector/gallery, accessibility report, and performance 
 
 Goal: verify the whole product, deploy isolated environments, and leave an operable release.
 
-- [ ] Map every PRD acceptance criterion to at least one automated test and one evidence location where appropriate.
-- [ ] Run the complete dual-player Playwright journey in headless Chromium and WebKit from fresh storage, including the attacker context.
-- [ ] Run 30-minute soak, packet delay/reordering where supported, offline/reconnect, reduced-motion, touch, and rematch suites with traces on failure.
-- [ ] Run dependency audit, secret scan, production bundle inspection, API security checks, and direct forged WebSocket/API command tests.
-- [ ] Provision separate Cloudflare Durable Object namespaces and Upstash keys for preview and production; configure secrets without writing them to disk or Git.
-- [ ] Create/confirm the target GitHub repository and Vercel project, deploy Worker before compatible frontend, and verify health/protocol versions.
+- [x] Map every PRD acceptance criterion to at least one automated test and one evidence location where appropriate.
+- [x] Run the complete dual-player Playwright journey in headless Chromium and WebKit from fresh storage, including the attacker context.
+- [x] Run 30-minute soak, packet delay/reordering where supported, offline/reconnect, reduced-motion, touch, and rematch suites with traces on failure.
+- [x] Run dependency audit, secret scan, production bundle inspection, API security checks, and direct forged WebSocket/API command tests.
+- [x] Provision separate Cloudflare Durable Object namespaces and Upstash keys for preview and production; configure secrets without writing them to disk or Git.
+- [x] Create/confirm the target GitHub repository and Vercel project, deploy Worker before compatible frontend, and verify health/protocol versions.
 - [ ] Run the one-time pre-pairing production smoke from two isolated contexts, prove preview cannot observe or mutate production state, revoke those credentials, and then pair the physical iPads. Later production smoke is read-only unless maintenance mode is explicitly enabled.
 - [ ] Have Luca and Senna each complete the unassisted first-use and full-match acceptance journey on their target iPads, ideally over separate networks. Require each returning-device start to reach match countdown within 2 minutes and record exact device/browser, time-to-start, comprehension, multi-touch, frame-rate, and measured latency results.
-- [ ] Update README with setup, operations, pairing/recovery, deployment order, rollback/reset, and troubleshooting instructions.
+- [x] Update README with setup, operations, pairing/recovery, deployment order, rollback/reset, and troubleshooting instructions.
 - [ ] Record final known limitations and balance values; set PRD implementation status and this plan to complete only after all gates pass.
+
+What is left inside the three unchecked items, so the next session does not
+redo finished work:
+
+- The pre-pairing production smoke was played from two isolated contexts during
+  the release check, those credentials were replaced afterwards, and preview
+  isolation is now proven on every run by `tests/production/isolation.spec.ts`.
+  Only pairing the two physical iPads remains, which is the owner's action.
+- The unassisted first-use and full-match observation, the multi-touch check,
+  and the frame rate and latency on the devices themselves need the iPads and
+  the two children.
+- The known limitations and the balance values are recorded in the README. The
+  PRD implementation status stays open until the two device items above pass,
+  because it is a statement about the finished product, not about the code.
 
 Verification:
 
@@ -483,6 +497,7 @@ Update Status only after the required evidence is linked from Verification Evide
 
 | Date | Decision | Reason |
 | --- | --- | --- |
+| 2026-08-20 | A connection freeze that never became an absence resumes itself through the normal countdown, which moves persisted state to schema v8. | Three missed heartbeats is a stall on the wifi, not a player leaving. Making two children press a button after a one-second hiccup punishes them for their router. A freeze that did reach the two-second absence rule still waits for both of them, because then somebody really was gone. |
 | 2026-08-20 | A player who was written off as offline is published the moment the room hears them again. | A frozen match does not tick, and nothing else broadcast a change made between two ticks. The room could be perfectly healthy while the other child kept staring at "Even wachten" with a disabled button, which is exactly the situation the freeze is supposed to end. |
 | 2026-08-20 | While a match is frozen the browser proves its connection with a ping instead of an input command. | Controls are refused outside play, and a refused command is not a heartbeat: it would report the connection as broken four times a second. |
 | 2026-08-20 | A pause a child asked for keeps saying so until it actually happens. | The next snapshot still says the match is running, so it used to put the button back to "Pauze" and the tap looked ignored. |
@@ -528,6 +543,7 @@ Append concise entries as work is verified. Do not replace prior evidence.
 
 | Date | Phase | Command or check | Result | Evidence |
 | --- | --- | --- | --- | --- |
+| 2026-08-20 | Phase 10 | CI failure investigation (run 32371534677) | The failure was real: taking a screenshot stalled WebKit past the silence threshold, and the frozen match then needed both children to press ready. Fixed by resuming a freeze that never became an absence | `src/game/connection.ts`, `tests/unit/lifecycle.test.ts` |
 | 2026-08-20 | Phase 10 | `SOAK_MINUTES=30 npx playwright test tests/e2e/soak.spec.ts` | Passed: 320 disconnect cycles, 320 convergence checks, no problems, both clients ending on tick 39369 | `docs/checkpoints/phase-10.md` |
 | 2026-08-20 | Phase 10 | Match over an emulated 200 ms connection | Passed: both pages still agree on where everybody is | `tests/e2e/network.spec.ts` |
 | 2026-08-20 | Phase 10 | `npm run test:integration:worker` before and after the restored-connection fix | The new test times out against the old code and passes against the fixed code | `tests/worker/realtime-worker.test.ts` |

@@ -158,6 +158,11 @@ test("both players move authoritatively and touch contacts combine", async ({
     }
   }
 
+  // Asking for a pause only means anything while the match is running, and a
+  // screenshot on a busy machine can stall a page long enough to freeze it.
+  await expect(luca.locator("#phase-status")).toHaveText("Spelen", {
+    timeout: 20_000,
+  });
   const immediatePause = await luca
     .getByRole("button", { name: "Pauze" })
     .evaluate((button: HTMLButtonElement) => {
