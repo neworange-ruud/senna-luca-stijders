@@ -9,7 +9,12 @@ test.beforeEach(async ({ request }) => {
   expect(response.ok()).toBe(true);
 });
 
-const sampleCount = Number(process.env.REALTIME_SAMPLES ?? 20);
+/**
+ * Enough samples for the 95th percentile to be a tail rather than the single
+ * worst round trip. With twenty samples it was literally the maximum, so one
+ * scheduling hiccup on a shared machine decided whether the budget held.
+ */
+const sampleCount = Number(process.env.REALTIME_SAMPLES ?? 60);
 const sampleIntervalMs = Number(process.env.REALTIME_INTERVAL_MS ?? 20);
 test.setTimeout(sampleCount > 100 ? 760_000 : 60_000);
 
@@ -28,7 +33,7 @@ test("two clients exchange authoritative movement within the local latency budge
   const effectiveSampleCount = process.env.REALTIME_SAMPLES
     ? sampleCount
     : browserName === "webkit"
-      ? 10
+      ? 30
       : sampleCount;
   const report = await page.evaluate(
     async ({ endpoint, samples, intervalMs }) => {
