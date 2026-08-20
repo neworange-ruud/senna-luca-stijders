@@ -707,6 +707,9 @@ export class GameRoom {
     const phaseBeforeTick = this.state.match.phase;
     if (this.state.match.phase === "countdown") {
       const priorPhase = this.state.match.phase;
+      // A countdown that leads back into a paused match is a resume, and
+      // advanceLifecycle clears that mark, so it has to be read first.
+      const resuming = this.state.match.resumeTarget === "playing";
       advanceLifecycle(this.state, this.state.match.tick + 1);
       if (
         priorPhase !== this.state.match.phase &&
@@ -716,7 +719,10 @@ export class GameRoom {
         // long quiet lobby would look like a failing connection on tick one.
         const now = Date.now();
         this.lastHeardAt = { luca: now, senna: now };
-        initializeArena(this.state, this.arena());
+        // Only a match that is starting gets a fresh arena. Resuming after a
+        // pause must leave everything exactly as the children left it: where
+        // they stood, what they carried, and any chest already on its way.
+        if (!resuming) initializeArena(this.state, this.arena());
         await this.persist();
         confirmed = true;
       }

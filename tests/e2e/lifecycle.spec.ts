@@ -94,6 +94,40 @@ test("a pause names who asked for it and needs both players to resume", async ({
   await pair(senna, "Senna");
   await startMatch(luca, senna);
 
+  // Walk a little first, so a resume that quietly restarts the match instead
+  // of continuing it would put both fighters back on their spawns.
+  const box = await luca
+    .getByRole("button", { name: "Naar rechts" })
+    .boundingBox();
+  await luca.mouse.move(
+    (box?.x ?? 0) + (box?.width ?? 0) / 2,
+    (box?.y ?? 0) + (box?.height ?? 0) / 2,
+  );
+  const startedAt = Number(
+    await luca.locator("#opponent-status").getAttribute("data-distance"),
+  );
+  await luca.mouse.down();
+  await luca.waitForTimeout(800);
+  await luca.mouse.up();
+  // Wait until the server has actually reported the walk, so the reading is a
+  // real position rather than one the snapshot has not caught up with.
+  await expect
+    .poll(
+      async () =>
+        Math.abs(
+          Number(
+            await luca
+              .locator("#opponent-status")
+              .getAttribute("data-distance"),
+          ) - startedAt,
+        ),
+      { timeout: 15_000 },
+    )
+    .toBeGreaterThan(150);
+  const walkedTo = await luca
+    .locator("#opponent-status")
+    .getAttribute("data-distance");
+
   await luca.getByRole("button", { name: "Pauze" }).click();
   // The player who asked sees it first, then the other device.
   await expect(overlay(luca).title).toHaveText("Jij hebt gepauzeerd", {
@@ -117,6 +151,13 @@ test("a pause names who asked for it and needs both players to resume", async ({
     });
     await expect(overlay(page).root).toBeHidden();
   }
+  // A pause is not a restart: both children carry on from where they stood.
+  // A few units of drift is the last of the run being braked off; being put
+  // back on a spawn would be hundreds.
+  const resumedAt = await luca
+    .locator("#opponent-status")
+    .getAttribute("data-distance");
+  expect(Math.abs(Number(resumedAt) - Number(walkedTo))).toBeLessThan(100);
   await lucaContext.close();
   await sennaContext.close();
 });

@@ -24,6 +24,9 @@ interface RoomState {
     phase: string;
     tick: number;
     pauseReason?: string | null;
+    pauseEscalated?: boolean;
+    resumeTarget?: string | null;
+    countdownEndsTick?: number | null;
     chests: { position: { x: number; y: number } }[];
     chestSchedule: { nextAnnouncementTick: number };
     players: Record<
@@ -86,11 +89,12 @@ function startHeartbeat(
 function nextMessage(
   socket: WebSocket,
   predicate: (message: ProtocolMessage) => boolean,
+  waitMs = 2_000,
 ): Promise<ProtocolMessage> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(
       () => reject(new Error("Protocol message timed out")),
-      2_000,
+      waitMs,
     );
     const listener = (event: MessageEvent) => {
       const message = JSON.parse(String(event.data)) as ProtocolMessage;
@@ -452,6 +456,70 @@ describe("realtime Worker", () => {
       );
 
       stopHeartbeat();
+      luca.close();
+      senna.close();
+    },
+  );
+
+  it(
+    "resumes a paused match without moving anybody or losing a chest",
+    { timeout: 20_000 },
+    async () => {
+      const bindings = env as unknown as { GAME_ROOMS: DurableObjectNamespace };
+      const stub = bindings.GAME_ROOMS.getByName("development:main");
+      const luca = await connect("luca");
+      const senna = await connect("senna");
+      await stub.fetch("https://room.internal/debug/start-playing", {
+        method: "POST",
+      });
+      const chest = await stub.fetch(
+        "https://room.internal/debug/spawn-chest?outcome=camouflage&role=luca",
+        { method: "POST" },
+      );
+      expect(chest.status).toBe(200);
+
+      // Put the fighters somewhere that is not their spawn, then freeze the
+      // match the way a stalled connection would.
+      const before = await runInDurableObject(stub, (instance: GameRoom) => {
+        const room = instance as unknown as { state: RoomState };
+        const match = room.state.match;
+        match.players.luca.position = { x: 868, y: 1_104 };
+        match.players.senna.position = { x: 1_400, y: 1_104 };
+        match.phase = "paused";
+        match.pauseReason = "connection";
+        match.pauseEscalated = false;
+        return {
+          luca: { ...match.players.luca.position },
+          senna: { ...match.players.senna.position },
+          chests: match.chests.length,
+        };
+      });
+      expect(before.chests).toBe(1);
+
+      // The room hears both sides again and counts back in by itself.
+      const playingAgain = nextMessage(
+        luca,
+        (message) => message.snapshot?.state.match.phase === "playing",
+        15_000,
+      );
+      luca.send(JSON.stringify({ type: "ping", clientTime: 1 }));
+      senna.send(JSON.stringify({ type: "ping", clientTime: 1 }));
+      await expect(playingAgain).resolves.toBeDefined();
+
+      const after = await runInDurableObject(stub, (instance: GameRoom) => {
+        const room = instance as unknown as { state: RoomState };
+        const match = room.state.match;
+        return {
+          luca: { ...match.players.luca.position },
+          senna: { ...match.players.senna.position },
+          chests: match.chests.length,
+        };
+      });
+      // Same places, same chest: a pause is not a restart.
+      expect(after.luca.x).toBeCloseTo(before.luca.x, 0);
+      expect(after.senna.x).toBeCloseTo(before.senna.x, 0);
+      expect(after.chests).toBe(1);
+
       luca.close();
       senna.close();
     },

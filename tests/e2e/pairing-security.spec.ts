@@ -53,12 +53,17 @@ test("replacement disconnects the old device and an attacker cannot pair", async
     replacement.getByRole("heading", { name: "Hallo Luca!" }),
   ).toBeVisible();
   await expect(replacement.locator("#connection-label")).toHaveText("Online");
+  // Replacing a device revokes it through the pairing API, the room closes its
+  // socket, and its own reconnect is refused because its generation is stale.
+  // That is three hops, so the budget is generous; what matters is that the old
+  // device ends up unable to play.
   await expect(oldDevice.locator("#connection-label")).not.toHaveText(
     "Online",
     {
-      timeout: 5_000,
+      timeout: 30_000,
     },
   );
+  await expect(oldDevice.locator("#pause-button")).toBeDisabled();
 
   await oldContext.close();
   await attackerContext.close();

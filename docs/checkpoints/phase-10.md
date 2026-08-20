@@ -72,7 +72,7 @@ exactly two players, no heart was outside its bounds, and no entity was
 duplicated. Both clients ended on the same tick, 39369. No problems were
 recorded.
 
-## Four defects the release checks found
+## Five defects the release checks found
 
 None of these were test problems.
 
@@ -87,6 +87,13 @@ None of these were test problems.
   slower than the three-quarters of a second the room treats as silence. A
   frozen match now keeps proving its connection with a ping four times a second,
   so a real recovery is noticed immediately.
+- Resuming a paused match restarted it. Every countdown that led into play ran
+  the start-of-match initialisation, so a pause put both fighters back on their
+  spawns, removed a chest that was already on its way, and reset the chest
+  clock. The pause journey had only ever checked hearts and phase, so nobody
+  noticed. A resume now leaves the arena exactly as it was, and the journey
+  walks a fighter away from their spawn before pausing so a restart would be
+  visible.
 - A freeze caused by a stall demanded a ceremony to end. Three missed
   heartbeats is three quarters of a second, which on a home network is a stall
   rather than a player leaving, and both children had to press ready before the

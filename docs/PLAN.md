@@ -497,6 +497,7 @@ Update Status only after the required evidence is linked from Verification Evide
 
 | Date | Decision | Reason |
 | --- | --- | --- |
+| 2026-08-20 | Only a match that is starting gets a fresh arena; resuming after a pause leaves everything where the children left it. | Every resume ran the same start-of-match initialisation, so a pause put both fighters back on their spawns, deleted an announced chest, and reset the chest clock. That contradicts the Phase 8 rule that a returning player finds the same match, and it went unnoticed because the pause journey only checked hearts and phase. |
 | 2026-08-20 | A connection freeze that never became an absence resumes itself through the normal countdown, which moves persisted state to schema v8. | Three missed heartbeats is a stall on the wifi, not a player leaving. Making two children press a button after a one-second hiccup punishes them for their router. A freeze that did reach the two-second absence rule still waits for both of them, because then somebody really was gone. |
 | 2026-08-20 | A player who was written off as offline is published the moment the room hears them again. | A frozen match does not tick, and nothing else broadcast a change made between two ticks. The room could be perfectly healthy while the other child kept staring at "Even wachten" with a disabled button, which is exactly the situation the freeze is supposed to end. |
 | 2026-08-20 | While a match is frozen the browser proves its connection with a ping instead of an input command. | Controls are refused outside play, and a refused command is not a heartbeat: it would report the connection as broken four times a second. |
@@ -543,6 +544,7 @@ Append concise entries as work is verified. Do not replace prior evidence.
 
 | Date | Phase | Command or check | Result | Evidence |
 | --- | --- | --- | --- | --- |
+| 2026-08-20 | Phase 10 | CI failure investigation (run 32373865779) | The screenshot showed both fighters back on their spawns with the chest gone: every resume re-initialised the arena. Fixed, with a Worker test that puts the fighters somewhere else, freezes the match, and proves both positions and the chest survive the resume | `worker/index.ts`, `tests/worker/realtime-worker.test.ts`, `tests/e2e/lifecycle.spec.ts` |
 | 2026-08-20 | Phase 10 | CI failure investigation (run 32371534677) | The failure was real: taking a screenshot stalled WebKit past the silence threshold, and the frozen match then needed both children to press ready. Fixed by resuming a freeze that never became an absence | `src/game/connection.ts`, `tests/unit/lifecycle.test.ts` |
 | 2026-08-20 | Phase 10 | `SOAK_MINUTES=30 npx playwright test tests/e2e/soak.spec.ts` | Passed: 320 disconnect cycles, 320 convergence checks, no problems, both clients ending on tick 39369 | `docs/checkpoints/phase-10.md` |
 | 2026-08-20 | Phase 10 | Match over an emulated 200 ms connection | Passed: both pages still agree on where everybody is | `tests/e2e/network.spec.ts` |
