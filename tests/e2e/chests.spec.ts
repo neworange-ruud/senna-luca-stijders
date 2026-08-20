@@ -59,6 +59,22 @@ async function spawnChest(
   expect(response.ok()).toBe(true);
 }
 
+/**
+ * Holds the on-screen Action control, which is how the children open a chest.
+ * Keyboard events need the page to be focused, and with two browser contexts on
+ * a busy machine that focus is not guaranteed; a pointer on the control is.
+ */
+async function holdAction(page: Page): Promise<() => Promise<void>> {
+  const box = await page.getByRole("button", { name: "Actie" }).boundingBox();
+  const x = (box?.x ?? 0) + (box?.width ?? 0) / 2;
+  const y = (box?.y ?? 0) + (box?.height ?? 0) / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  return async () => {
+    await page.mouse.up();
+  };
+}
+
 async function moveTo(
   request: APIRequestContext,
   role: "luca" | "senna",
@@ -99,11 +115,11 @@ test("a match delivers every chest outcome to the player who opens it", async ({
   for (const [outcome, weapon] of expectations) {
     await spawnChest(request, outcome, "luca");
     // Holding Action claims the chest on the tick after it lands.
-    await luca.keyboard.down("KeyE");
+    const release = await holdAction(luca);
     await expect(luca.locator("#weapon-status")).toHaveText(weapon, {
       timeout: 10_000,
     });
-    await luca.keyboard.up("KeyE");
+    await release();
   }
 
   const powers: [string, RegExp][] = [
@@ -113,13 +129,13 @@ test("a match delivers every chest outcome to the player who opens it", async ({
   ];
   for (const [outcome, label] of powers) {
     await spawnChest(request, outcome, "luca");
-    await luca.keyboard.down("KeyE");
+    const release = await holdAction(luca);
     await expect
       .poll(() => luca.locator("#effect-status").getAttribute("aria-label"), {
         timeout: 10_000,
       })
       .toMatch(label);
-    await luca.keyboard.up("KeyE");
+    await release();
   }
 
   // The opponent sees the same authoritative rewards on their own device.
