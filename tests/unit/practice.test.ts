@@ -103,6 +103,46 @@ describe("practice mode", () => {
     expect(outOfRange.horizontal).toBe(-1);
   });
 
+  it("walks off a ledge instead of swinging at a player underneath", () => {
+    const state = practice();
+    const bot = state.match.players.senna;
+    const human = state.match.players.luca;
+    // The dummy on the western beach platform, the player on the sand below it.
+    bot.position = { x: 700, y: 1_070 - bot.size.height };
+    bot.grounded = true;
+    human.position = { x: 660, y: 1_200 - human.size.height };
+    const intent = practiceBotIntent(state, "senna", "fight");
+    expect(intent.horizontal).not.toBe(0);
+    expect(intent.jump).toBe(false);
+    // Swinging at somebody a storey below would only look broken.
+    expect(intent.attack).toBe(false);
+  });
+
+  it("keeps walking even when the player is straight below", () => {
+    const state = practice();
+    const bot = state.match.players.senna;
+    const human = state.match.players.luca;
+    bot.position = { x: 700, y: 1_070 - bot.size.height };
+    human.position = { x: 700, y: 1_200 - human.size.height };
+    expect(practiceBotIntent(state, "senna", "follow").horizontal).not.toBe(0);
+  });
+
+  it("jumps to climb towards the player and not merely to start walking", () => {
+    const state = practice();
+    const bot = state.match.players.senna;
+    const human = state.match.players.luca;
+    // Both on the sand, standing still: a first step is not a reason to jump,
+    // and with one-way platforms such a hop lands the dummy on the ledge above.
+    place(state, 500, 900);
+    bot.grounded = true;
+    bot.velocity.x = 0;
+    expect(practiceBotIntent(state, "senna", "follow").jump).toBe(false);
+
+    // The player up on the platform is a reason to jump.
+    human.position = { x: 900, y: 1_070 - human.size.height };
+    expect(practiceBotIntent(state, "senna", "follow").jump).toBe(true);
+  });
+
   it("reaches the player and lands authoritative hits in a solo session", () => {
     const state = createPracticeState("luca", { arena: BEACH_ARENA });
     for (let tick = 0; tick < 600; tick += 1) {

@@ -77,6 +77,8 @@ Er zijn zes werelden en ze spelen echt anders:
 | Stad          | Een straat met twee daken die je alleen met de lift bereikt.          |
 | Boot          | De kleinste wereld, voor een korte partij.                            |
 
+Platformen houden je alleen tegen van boven. Je kunt er dus van onderaf doorheen springen en er bovenop landen; je stoot nooit je hoofd tegen een platform en je blijft er ook niet met je schouder tegenaan staan. De vloer en de dingen om je achter te verstoppen zijn wel gewoon massief.
+
 In de stad staan liften. Een lift gaat altijd naar de lift met dezelfde naam, en die naam staat er bij, dus je ziet waar je uitkomt zonder een menu. Ga op de lift staan en druk op Actie. Staat de andere speler precies op de uitgang, dan kom je er netjes naast te staan; is er helemaal geen plek, dan blijf je staan en kun je het meteen opnieuw proberen.
 
 Boven het speelveld staat steeds een korte tip, en niet meer dan een. De tip verdwijnt zodra je de knop een keer gebruikt hebt en komt daarna niet meer terug, ook niet in een volgende wedstrijd. Een kist of een lift binnen bereik gaat altijd voor.

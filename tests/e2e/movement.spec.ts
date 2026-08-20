@@ -178,3 +178,39 @@ test("both players move authoritatively and touch contacts combine", async ({
   await lucaContext.close();
   await sennaContext.close();
 });
+
+test("a child jumps up through a platform and lands on top of it", async ({
+  browser,
+  request,
+}) => {
+  const device = { viewport: { width: 1180, height: 820 }, hasTouch: true };
+  const lucaContext = await browser.newContext(device);
+  const sennaContext = await browser.newContext(device);
+  const luca = await lucaContext.newPage();
+  const senna = await sennaContext.newPage();
+  await pair(luca, "Luca");
+  await pair(senna, "Senna");
+  await startMatch(luca, senna);
+
+  const feet = (page: Page, which: "own" | "peer"): Promise<number> =>
+    page
+      .locator("#opponent-status")
+      .getAttribute(which === "own" ? "data-own-y" : "data-peer-y")
+      .then((value) => Number(value ?? "0"));
+
+  // Standing on the sand, directly under the western beach platform.
+  const placed = await request.post(
+    "http://127.0.0.1:8787/debug/give-weapon?role=luca&item=nerf&x=700&y=1104",
+  );
+  expect(placed.ok()).toBe(true);
+  await expect.poll(() => feet(luca, "own"), { timeout: 10_000 }).toBe(1_200);
+
+  // One press of Springen is enough to come up through it.
+  await luca.getByRole("button", { name: "Spring" }).click();
+  await expect.poll(() => feet(luca, "own"), { timeout: 10_000 }).toBe(1_070);
+  // The other device agrees, because the server decided it.
+  await expect.poll(() => feet(senna, "peer"), { timeout: 10_000 }).toBe(1_070);
+
+  await lucaContext.close();
+  await sennaContext.close();
+});

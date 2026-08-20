@@ -89,13 +89,24 @@ export function practiceBotIntent(
     };
   }
 
+  const humanIsLower = human.position.y - bot.position.y > CLIMB_HEIGHT;
+  if (humanIsLower) {
+    // Platforms are one-way, so the only way down from a ledge is to walk off
+    // the edge. Keep walking rather than swinging at somebody underneath.
+    return {
+      ...EMPTY_INPUT,
+      horizontal: towards === 0 ? 1 : towards,
+    };
+  }
+
   const range = behaviour === "fight" ? MELEE.unarmed.range : KEEP_DISTANCE;
   const withinReach = gap <= MELEE.unarmed.range;
   const approach: InputIntent["horizontal"] = gap > range ? towards : 0;
-  // Walking into arena cover or a platform edge zeroes horizontal speed, so the
-  // opponent hops instead of pressing against the obstacle forever.
-  const blocked = approach !== 0 && bot.velocity.x === 0;
-  const jump = bot.grounded && (humanIsHigher || blocked);
+  // Only ever jump to climb towards the player. It used to hop whenever it had
+  // no speed, which on its first step is always true; with one-way platforms
+  // that hop carried it up onto the ledge above its own spawn, where it stood
+  // and swung at the player underneath.
+  const jump = bot.grounded && humanIsHigher;
   if (behaviour === "follow") {
     return { ...EMPTY_INPUT, horizontal: approach, jump };
   }

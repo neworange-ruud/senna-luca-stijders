@@ -31,6 +31,7 @@ function player(role: PlayerRole): PlayerState {
     attackHeldTicks: 0,
     attackQueued: false,
     actionQueued: false,
+    jumpQueued: false,
     teleportReadyTick: 0,
     selectedSlot: UNARMED_SLOT,
     lastProcessedSequence: 0,

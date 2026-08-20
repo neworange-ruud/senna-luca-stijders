@@ -1,4 +1,4 @@
-export const GAME_SCHEMA_VERSION = 8 as const;
+export const GAME_SCHEMA_VERSION = 9 as const;
 export const GAME_PROTOCOL_VERSION = 1 as const;
 
 export type PlayerRole = "luca" | "senna";
@@ -174,6 +174,8 @@ export interface PlayerState {
   attackQueued: boolean;
   /** The same memory for the Action control, which claims chests and rides lifts. */
   actionQueued: boolean;
+  /** And for the jump, so a quick tap on Springen never goes missing either. */
+  jumpQueued: boolean;
   /** The tick from which this player may use a teleport again. */
   teleportReadyTick: number;
   /** -1 selects unarmed combat, otherwise the index of an inventory slot. */

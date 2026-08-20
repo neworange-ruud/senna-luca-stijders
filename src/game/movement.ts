@@ -109,7 +109,12 @@ export function movePlayer(
     player.facing = input.horizontal < 0 ? "left" : "right";
   }
 
-  if (input.jump && player.grounded) {
+  // A tap on Springen that came and went between two ticks still jumps, the
+  // same way a tap on Aanval or Actie does. The memory is used up by this tick
+  // either way, so it can never turn into a second jump later on.
+  const wantsJump = input.jump || player.jumpQueued;
+  player.jumpQueued = false;
+  if (wantsJump && player.grounded) {
     player.velocity.y = -MOVEMENT.jumpImpulse;
     player.grounded = false;
   }

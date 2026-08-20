@@ -52,6 +52,7 @@ export function setInputIntent(
   // Remember a press even if it is released again before the next tick.
   if (intent.attack && !player.input.attack) player.attackQueued = true;
   if (intent.action && !player.input.action) player.actionQueued = true;
+  if (intent.jump && !player.input.jump) player.jumpQueued = true;
   player.input = { ...intent };
   if (intent.switchWeapon && !wasSwitching && state.match.phase === "playing") {
     switchWeapon(player);

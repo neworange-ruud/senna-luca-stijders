@@ -115,3 +115,34 @@ frames or differ between the two iPads.
   the drawing really changes while walking, and jumping changes it again.
 - `tests/unit/asset-pipeline.test.ts` still passes unchanged, so the keying fix
   did not weaken what it already guaranteed.
+
+## Jumping through platforms
+
+Platforms only stop a fall onto their top edge now. A child can jump up through
+one and land on it, never bumps their head on one, and never sticks to its side
+while pressing towards it. Floors and cover are unchanged and still solid from
+every side, so the ground is still the ground and a hut is still something to
+hide behind. Shots already ignored platforms, so moving and shooting now agree.
+
+Testing it turned up the third control with the same old defect: a tap on
+Springen shorter than one 33 ms tick was thrown away, so the single tap that this
+whole feature is built around did nothing in Chromium while working in WebKit.
+The press is now remembered until a tick uses it, exactly as the attack and
+Action presses are, which moves persisted state to schema v9.
+
+- `tests/unit/one-way-platforms.test.ts` (7 tests): a rising box passes through,
+  the same box is caught on the way down, a box resting on a platform stays on
+  it for thirty ticks, a platform never blocks sideways, the floor and the cover
+  stay solid from every side including from below, a tap between two ticks still
+  jumps and cannot become a second jump, and a child on the beach jumps from the
+  sand onto the platform above.
+- `tests/e2e/movement.spec.ts`: one press of Springen takes a child from the
+  sand at 1200 to the platform at 1070, and the other device agrees, because the
+  server decided it.
+
+The training dummy needed two changes to keep up with one-way platforms. It used
+to hop whenever it had no horizontal speed, which is always true on its first
+step, and that hop now carried it up through the ledge above its own spawn, where
+it stood swinging at the player underneath. It now only jumps to climb towards
+the player, and when the player is below it, it walks until it falls off the
+edge, since that is the only way down.

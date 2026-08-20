@@ -189,6 +189,22 @@ export interface CollisionResult {
   grounded: boolean;
 }
 
+/**
+ * How much a mover may already be inside a platform and still land on it. It
+ * absorbs the fraction of a unit that a fixed tick leaves behind when somebody
+ * is resting on an edge, so standing on a platform does not sink through it.
+ */
+const LANDING_TOLERANCE = 1;
+
+/**
+ * Moves a box through the arena and reports what it ran into.
+ *
+ * A floor and a piece of cover are solid: they stop a move from every side. A
+ * platform is one-way. It only stops a fall onto its top edge, so a child can
+ * jump up through a platform and land on it, and never bumps their head or
+ * their shoulder on one. Shots already ignore platforms, so this makes moving
+ * agree with shooting.
+ */
 export function moveWithCollisions(
   rectangle: Rectangle,
   delta: Vector,
@@ -201,7 +217,7 @@ export function moveWithCollisions(
   let grounded = false;
 
   for (const surface of surfaces) {
-    if (!intersects(next, surface)) continue;
+    if (surface.kind === "platform" || !intersects(next, surface)) continue;
     if (delta.x > 0) {
       next.x = Math.min(next.x, surface.x - next.width);
       hitRight = true;
@@ -211,9 +227,20 @@ export function moveWithCollisions(
     }
   }
 
+  // Where the underside of the box was before it moved down, which is what
+  // decides whether a platform is being landed on or passed through.
+  const previousBottom = next.y + next.height;
   next.y += delta.y;
   for (const surface of surfaces) {
     if (!intersects(next, surface)) continue;
+    if (surface.kind === "platform") {
+      const landing =
+        delta.y > 0 && previousBottom <= surface.y + LANDING_TOLERANCE;
+      if (!landing) continue;
+      next.y = Math.min(next.y, surface.y - next.height);
+      grounded = true;
+      continue;
+    }
     if (delta.y > 0) {
       next.y = Math.min(next.y, surface.y - next.height);
       grounded = true;
