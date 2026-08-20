@@ -33,7 +33,7 @@ name = "senna-luca-strijders-production"
 [env.production.vars]
 APP_ENV = "production"
 CLIENT_ORIGIN = "https://senna-luca-stijders.vercel.app"
-ROOM_ID = "main"
+ROOM_ID = "release-20260820"
 
 [[env.production.durable_objects.bindings]]
 name = "GAME_ROOMS"

@@ -34,6 +34,23 @@ Date: 2026-08-20
 - The Phase 6 duel fixture still replays identically twice; its hash is now `361b7f5ed5db72259214b0784fec99ce88ac3b1bb54e088a4ca8c670b0657730` because schema v4 adds chest fields to the snapshot that is hashed. Its asserted event sequence and final hearts are unchanged.
 - The journey uses a development-only `/debug/spawn-chest` route (local development with `E2E_IN_MEMORY` only) to skip the twelve-second wait between chests. The landing, the claim, and the reward all run through the real authoritative rules; only the schedule is short-circuited, and the schedule itself is covered by unit tests.
 
+## Deployed Verification
+
+Worker before frontend, as the plan requires:
+
+| Environment | Worker | Room | Health |
+| --- | --- | --- | --- |
+| Preview | `senna-luca-strijders-preview` version `e2cacbba-403c-48e4-be58-bc9189a36b90` | `gate-20260819` | protocol 1, schema 4 |
+| Production | `senna-luca-strijders-production` version `537e1456-79d8-4fec-8b84-59748ea56dd2` | `release-20260820` | protocol 1, schema 4 |
+
+- Vercel production deployment is Ready and aliased to `https://senna-luca-stijders.vercel.app`.
+- `npm run test:production`: 5 read-only checks in Chromium and 5 in WebKit. Health, the Dutch unpaired refusal, the retired state surface, no secret in the browser bundle, artwork delivery, and a full test-mode match on the deployed build.
+- `tests/production/paired.spec.ts`: two isolated contexts paired Luca and Senna against the production URL, reached one authoritative match, both moved and converged, remote latency stayed far inside the 350 ms p95 budget, and neither player took phantom damage. Evidence: [`phase-07-production.png`](./phase-07-production.png).
+- Before provisioning, production rejected every pin including an empty one, so an unconfigured environment fails closed rather than open.
+- Environment isolation is structural: each environment has its own Worker, its own Durable Object room id, its own signing and internal secrets, and Redis keys prefixed with the environment name, so a preview credential cannot address production state. The runtime proof of that isolation stays a Phase 10 gate.
+
+The production `ADMIN_PIN` is a temporary release-check value. It must be replaced with the owner's own pin, and the release-check device credentials are replaced automatically the first time the physical iPads are paired.
+
 ## Remaining
 
 Pause and reconnect behaviour around chests, the winner overlay, and rematch consent are Phase 8. Distinct geometry per world and teleports are Phase 9.
