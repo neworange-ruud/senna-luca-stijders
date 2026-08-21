@@ -4,12 +4,12 @@ This is the durable execution record for implementing [`PRD.md`](./PRD.md). It i
 
 ## Status
 
-- Last updated: 2026-08-20
-- Overall status: Feature complete and deployed; waiting on the two physical iPads
+- Last updated: 2026-08-21
+- Overall status: Feature complete and deployed; the children have now played on their own iPads and the two defects that first play exposed are fixed and waiting to be deployed
 - Current phase: Phase 10 - Final headless acceptance, deployment, and physical release. Phase 11 (animated player sprites) was added afterwards at the owner's request and is complete.
 - Implementation progress: 11 of 12 phases complete; Phase 11 was added at the owner's request after Phase 10
 - Current blocker: None for the automated part of Phase 10. Two items need the physical devices: the exact target iPad model identifiers, and the unassisted first-use and frame-rate measurements on them.
-- Next action: Pair the two iPads with the production pin, then run the observed first-use and full-match journeys and record the device identifiers, time to start, comprehension, multi-touch, frame rate, and latency. Everything that can be checked without a device is done and deployed on schema v8.
+- Next action: Deploy the iPad layout and selection fix, then confirm on the devices that a held control no longer selects text and that the arena reaches the bottom of the screen. After that, pair the two iPads with the production pin and run the observed first-use and full-match journeys, recording the device identifiers, time to start, comprehension, multi-touch, frame rate, and latency.
 
 Status values used below:
 
@@ -441,7 +441,11 @@ redo finished work:
   Only pairing the two physical iPads remains, which is the owner's action.
 - The unassisted first-use and full-match observation, the multi-touch check,
   and the frame rate and latency on the devices themselves need the iPads and
-  the two children.
+  the two children. First play on the devices happened on 2026-08-21 and
+  reported two faults, both fixed and covered by `tests/e2e/ipad.spec.ts`: a
+  held control started a text selection, and the arena was clipped at the
+  bottom. Neither is visible on a 16:9 viewport, so the observation itself is
+  still owed once the fix is deployed.
 - The known limitations and the balance values are recorded in the README. The
   PRD implementation status stays open until the two device items above pass,
   because it is a statement about the finished product, not about the code.
@@ -654,6 +658,9 @@ Append concise entries as work is verified. Do not replace prior evidence.
 | 2026-08-20 | Phase 8 | Lifecycle browser journeys | Passed in Chromium and WebKit: a named pause needing both players, a real network outage that freezes both sides and recovers, and a winner overlay with rematch consent and a reset to the other chooser | `tests/e2e/lifecycle.spec.ts`, `docs/checkpoints/phase-08-winner.png` |
 | 2026-08-20 | Phase 8 | Disconnect soak | Passed: repeated disconnect and recovery cycles with both clients convergent on the same tick after every recovery, no duplicate entities, and health always inside bounds; the soak surfaced two real defects, both fixed | `tests/e2e/soak.spec.ts`, `docs/checkpoints/phase-08.md` |
 | 2026-08-20 | Phase 8 | `npm run check` | Passed: 172 unit, 10 Node integration, 11 Worker integration tests, formatting, typed lint, three-runtime type checks, and production build | `docs/checkpoints/phase-08.md` |
+| 2026-08-21 | Phase 10 device feedback | iPad-sized layout measurement at 1024x768 in WebKit | Reproduced then fixed: the stage overflowed its own box by 54 px with a hint showing and the canvas ended 58 px below the visible stage, and the hint's box sat inside the status bar's. After the fix the overflow is 0, the canvas ends inside the stage, and the hint starts below the status bar | `tests/e2e/ipad.spec.ts`, `docs/checkpoints/phase-10-ipad-fit.png` |
+| 2026-08-21 | Phase 10 device feedback | iPad selection gesture checks | Passed: the canvas, the controls, and the status bar all report `-webkit-user-select: none`, a drag across the status bar leaves the selection empty, `selectstart`, `contextmenu` and `dragstart` are all refused, and the pincode field is still selectable so a grown-up can pair a device | `tests/e2e/ipad.spec.ts` |
+| 2026-08-21 | Phase 10 device feedback | `npm run check`, `npm run test:e2e`, `npm run test:e2e:webkit` | Passed: 247 unit, 10 Node, 14 Worker tests, formatting, typed lint, three-runtime type checks, production build, and 30 Chromium plus 28 WebKit journeys with the 2 pre-existing WebKit skips | Local command output |
 
 ## Session Log
 
@@ -686,3 +693,4 @@ Append one row at session start and update its outcome before session end.
 | 2026-08-20 | Phase 9 | Gave all six worlds their own validated geometry, added named lifts to the city with cooldown and safe arrival, added one-at-a-time Dutch hints that stop once a control is used, centralised and audited every Dutch label, added a pause cue, and ran automated accessibility and performance passes. | Complete and verified. `npm run check` (228 unit, 10 Node, 12 Worker) and 43 journeys in both engines pass; frame reports are in `docs/checkpoints/`. Restart at Phase 10's first unchecked task; inspect `docs/checkpoints/phase-09.md`. |
 | 2026-08-20 | Phase 8 hardening | Fixed three defects the winner journey exposed: a finished match was reported to nobody when its last tick fell between two snapshots, a tap shorter than one tick was dropped, and a control release that missed its button stayed held forever. Added regression tests for all three. | Complete and verified. `npm run check` (173 unit, 10 Node, 12 Worker), both browser engines, and the disconnect soak pass; the previously intermittent winner journey passed three consecutive chain runs. Restart at Phase 9's first unchecked task. |
 | 2026-08-20 | Phase 8 | Implemented the whole lifecycle: one Dutch overlay for every interruption, pause with requester and reason, input heartbeats with a symmetric connection freeze and offline escalation, reconnect reconciliation, winner overlay with rematch consent and exhaustive reset, divergence recovery, and a checkpoint drain that keeps credential generations. | Complete and verified. `npm run check`, both browser engines, and a disconnect soak pass. Restart at Phase 9's first unchecked task; inspect `docs/checkpoints/phase-08.md`. |
+| 2026-08-21 | Phase 10 device feedback | Fixed the two faults the children's first play on their own iPads exposed: a held control or a finger resting on the status bar started a text selection and a callout menu, and the hint line sat in the stage's flow so an appearing hint clipped 58 px off the bottom of the arena and hid itself behind the status bar. Moved the status bar and hint into one overlay layer, disabled selection in both the prefixed and standard spellings, and refused the selection gestures iPadOS starts before CSS can stop them. | Complete and verified. `npm run check` (247 unit, 10 Node, 14 Worker), 30 Chromium and 28 WebKit journeys (2 pre-existing WebKit skips) pass, including three new iPad-sized regressions. Restart at Phase 10's first unchecked task; the fix still has to be deployed and then seen on the devices. |

@@ -757,10 +757,31 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(
 )) {
   const action = button.dataset.control as ControlAction;
   button.addEventListener("pointerdown", (event) => {
+    // A control is held down, often for seconds at a time. Left to itself an
+    // iPad reads that as the start of a text selection or a callout menu, and
+    // the child is suddenly fighting the browser instead of the other player.
+    event.preventDefault();
     if (event.isPrimary) button.setPointerCapture(event.pointerId);
     inputMapper.press(`pointer:${event.pointerId}`, action);
     sendInput();
   });
+}
+
+// Disabling selection in CSS is not enough on iPadOS: a long press or a
+// two-finger sweep still begins one. Outside a text field there is nothing here
+// worth selecting, so the gesture is refused wherever it starts.
+function refuseSelection(event: Event): void {
+  const target = event.target;
+  if (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement
+  )
+    return;
+  event.preventDefault();
+}
+
+for (const eventName of ["selectstart", "contextmenu", "dragstart"] as const) {
+  document.addEventListener(eventName, refuseSelection);
 }
 
 // The release is heard on the window, not on the button. A finger that slides

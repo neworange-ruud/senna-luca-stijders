@@ -16,9 +16,23 @@ body {
   /* A child dragging on the arena must not pull the page around or trigger the
      browser's own pull-to-refresh and swipe-back gestures. */
   overscroll-behavior: none;
+  /* Nothing here is text to read and copy; every press is a move in a game. An
+     iPad turns a held finger into a text selection and a callout menu unless it
+     is told otherwise, and older iPads only understand the prefixed spellings.
+     The one exception is the pincode field, restored below. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   background:
     radial-gradient(circle at 80% 10%, #ffd866 0 11rem, transparent 11.2rem),
     linear-gradient(135deg, #f7f0dd, #cfe9df);
+}
+/* A grown-up typing the pincode still needs to be able to place a cursor. */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 button,
 input {
@@ -408,12 +422,23 @@ legend,
   width: 100%;
   height: min(70vh, 760px);
 }
-.game-hud {
+/* Everything that floats above the arena, stacked in one column. Keeping the
+   hint out of the stage's flow is what stops it from shrinking the canvas and
+   clipping the bottom of the world; the canvas can then simply be the stage. */
+.stage-top {
   position: absolute;
   z-index: 2;
   inset: max(0.75rem, env(safe-area-inset-top))
     max(0.75rem, env(safe-area-inset-right)) auto
     max(0.75rem, env(safe-area-inset-left));
+  display: grid;
+  gap: 0.4rem;
+  /* Only the status bar itself catches a finger. The rest of this strip is
+     arena, and a drag that starts there still moves a child. */
+  pointer-events: none;
+}
+.game-hud {
+  pointer-events: auto;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -499,6 +524,9 @@ legend,
   background: #9fd6a8;
 }
 .game-hud button {
+  /* The status bar covers the sky, and on a 4:3 iPad there is not much of it.
+     44 pixels is the smallest a finger target may be, so it is what these are. */
+  min-height: 2.75rem;
   margin-left: auto;
   padding: 0.3rem 0.7rem;
   border: 2px solid #10283b;
@@ -714,6 +742,17 @@ body[data-test-mode="aan"] .player-view[data-phase="finished"] {
   margin-top: 0;
 }
 
+/* On an iPad the browser's own toolbar is part of the 100vh that CSS reports,
+   so a lobby asked to be exactly that tall ends up taller than the screen and
+   scrolls a little under every finger. Where the browser knows the honest
+   height, use it. */
+@supports (min-height: 100dvh) {
+  body,
+  .shell {
+    min-height: 100dvh;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -730,7 +769,7 @@ body[data-test-mode="aan"] .player-view[data-phase="finished"] {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  margin: 0.4rem 0 0;
+  margin: 0;
   padding: 0.55rem 0.9rem;
   border: 3px solid #1d5c34;
   border-radius: 14px;
