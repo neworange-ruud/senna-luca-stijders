@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BEACH_ARENA } from "../../src/game/arenas/beach";
 import {
+  canClaimChest,
+  chestAtPoint,
   chestClaimant,
   drawChestOutcome,
   selectChestPoint,
@@ -319,5 +321,74 @@ describe("match reset", () => {
       500 + CHESTS.firstAnnouncementTicks,
     );
     expect(simulateMovementTick(state, BEACH_ARENA).events).toEqual([]);
+  });
+});
+
+describe("opening a chest by tapping it", () => {
+  /** A chest standing on the beach floor, without waiting for the schedule. */
+  function chestAt(x: number, y = 1_200): ChestState {
+    return {
+      id: `chest-at-${x}`,
+      pointId: "chest-west-floor",
+      position: { x, y },
+      outcome: "sword",
+      announcedAtTick: 0,
+      landsAtTick: 0,
+      recovery: false,
+    };
+  }
+
+  it("finds the chest a tap on its own picture is aimed at", () => {
+    const chest = chestAt(900);
+    // The body runs from x 868 to 932 and y 1144 to 1200.
+    expect(chestAtPoint([chest], { x: 900, y: 1_170 })).toBe(chest);
+    expect(chestAtPoint([chest], { x: 869, y: 1_145 })).toBe(chest);
+    expect(chestAtPoint([chest], { x: 931, y: 1_199 })).toBe(chest);
+  });
+
+  it("forgives a tap that lands just beside the chest", () => {
+    const chest = chestAt(900);
+    const nearMiss = { x: 932 + CHESTS.tapTolerance - 1, y: 1_170 };
+    const clearMiss = { x: 932 + CHESTS.tapTolerance + 1, y: 1_170 };
+    expect(chestAtPoint([chest], nearMiss)).toBe(chest);
+    expect(chestAtPoint([chest], clearMiss)).toBeNull();
+  });
+
+  it("means the nearer chest when a tap could be either", () => {
+    const near = chestAt(900);
+    const far = chestAt(900 + 60);
+    // Sitting between them, but closer to the second.
+    const point = { x: 945, y: 1_170 };
+    expect(chestAtPoint([near, far], point)).toBe(far);
+    expect(chestAtPoint([far, near], point)).toBe(far);
+  });
+
+  it("means nothing when the tap is nowhere near a chest", () => {
+    expect(chestAtPoint([chestAt(900)], { x: 2_400, y: 1_170 })).toBeNull();
+    expect(chestAtPoint([], { x: 900, y: 1_170 })).toBeNull();
+  });
+
+  it("agrees with the claim about who is close enough", () => {
+    const state = playing();
+    const chest = chestAt(900);
+    state.match.chests = [chest];
+    standAt(state, "luca", chest);
+    const luca = state.match.players.luca;
+    expect(canClaimChest(luca, chest)).toBe(true);
+    // The same reach the authoritative claim uses, so a tap can never promise
+    // an opening the room then refuses.
+    expect(chestClaimant(state, chest, 2)).toBe("luca");
+
+    luca.position = { x: chest.position.x + 400, y: 1_104 };
+    expect(canClaimChest(luca, chest)).toBe(false);
+    expect(chestClaimant(state, chest, 2)).toBeNull();
+  });
+
+  it("refuses a knocked-out child, however close they are standing", () => {
+    const state = playing();
+    const chest = chestAt(900);
+    standAt(state, "luca", chest);
+    state.match.players.luca.health = 0;
+    expect(canClaimChest(state.match.players.luca, chest)).toBe(false);
   });
 });

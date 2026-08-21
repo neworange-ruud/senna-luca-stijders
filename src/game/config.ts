@@ -62,6 +62,11 @@ export const CHESTS = {
   maximumActive: 2,
   claimRange: 72,
   /**
+   * How far outside the chest a tap still counts as meaning that chest. A child
+   * aims at the picture rather than at the collision box, and the picture bobs.
+   */
+  tapTolerance: 28,
+  /**
    * A player must trail by at least this many hearts for a scheduled chest to
    * count towards the recovery rule.
    */

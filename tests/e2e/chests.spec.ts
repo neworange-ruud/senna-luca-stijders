@@ -147,3 +147,70 @@ test("a match delivers every chest outcome to the player who opens it", async ({
   await lucaContext.close();
   await sennaContext.close();
 });
+
+test("a chest is opened by tapping the chest itself", async ({
+  browser,
+  request,
+}, testInfo) => {
+  const device = { viewport: { width: 1180, height: 820 }, hasTouch: true };
+  const lucaContext = await browser.newContext(device);
+  const sennaContext = await browser.newContext(device);
+  const luca = await lucaContext.newPage();
+  const senna = await sennaContext.newPage();
+  await pair(luca, "Luca");
+  await pair(senna, "Senna");
+  await startMatch(luca, senna);
+
+  // Luca waits at the western chest point; Senna stays far out of reach.
+  await moveTo(request, "luca", 868);
+  await moveTo(request, "senna", 1_400);
+  await expect(luca.locator("#weapon-status")).toHaveText(
+    "Blaster · 6 pijltjes",
+  );
+
+  await spawnChest(request, "sword", "luca");
+  // This tip only appears once the chest has landed and is genuinely in reach,
+  // which is exactly the moment a tap is supposed to start working.
+  await expect(luca.locator("#hint-text")).toHaveText(
+    "Tik op de kist om hem te openen.",
+    { timeout: 10_000 },
+  );
+
+  /**
+   * Where the chest is drawn. Luca stands at the western point, so the camera
+   * has centred Luca's box on it, and at this viewport the camera is pinned to
+   * the bottom of the 1400 pixel high beach. That puts the chest's own centre
+   * on the canvas centre line, 228 pixels above the canvas floor.
+   */
+  const box = (await luca.locator("#game-canvas").boundingBox())!;
+  const chestPoint = {
+    x: box.x + box.width / 2,
+    y: box.y + box.height - 228,
+  };
+
+  // What a child sees when a chest is theirs to open: the ring around it and
+  // the invitation to tap, rather than the name of a button to go and find.
+  if (testInfo.project.name === "chromium") {
+    await luca.screenshot({ path: "docs/checkpoints/phase-10-chest-tap.png" });
+  }
+
+  // A tap on empty arena is not an action. Nothing is claimed by tapping about.
+  await luca.mouse.click(box.x + 120, chestPoint.y);
+  await luca.waitForTimeout(600);
+  await expect(luca.locator("#weapon-status")).toHaveText(
+    "Blaster · 6 pijltjes",
+  );
+
+  // A tap on the chest is, and one tap is enough: the press is latched, so it
+  // survives being shorter than a single simulated tick.
+  await luca.mouse.click(chestPoint.x, chestPoint.y);
+  await expect(luca.locator("#weapon-status")).toHaveText("Zwaard", {
+    timeout: 10_000,
+  });
+
+  // The opponent's device agrees, because the room decided the claim.
+  await expect(senna.locator("#phase-status")).toHaveText("Spelen");
+  await luca.screenshot({ path: testInfo.outputPath("chest-tap.png") });
+  await lucaContext.close();
+  await sennaContext.close();
+});
