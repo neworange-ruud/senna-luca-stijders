@@ -596,8 +596,12 @@ legend,
 .touch-controls button {
   /* Comfortably above the 44 pixel minimum, with small fingers in mind. */
   min-width: 4.5rem;
-  min-height: 3.5rem;
-  padding: 0.7rem;
+  min-height: 4.25rem;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.1rem;
+  padding: 0.5rem;
   -webkit-touch-callout: none;
   border: 3px solid #10283b;
   border-radius: 50%;
@@ -607,6 +611,31 @@ legend,
   box-shadow: 3px 3px 0 #10283b;
   touch-action: none;
   user-select: none;
+}
+.touch-controls button span {
+  /* The word is the smaller half of the button: the picture is what a child who
+     cannot read yet is aiming at. */
+  font-size: 0.7rem;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+.control-icon {
+  width: 1.7rem;
+  height: 1.7rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.control-icon .filled {
+  fill: currentColor;
+  stroke: none;
+}
+.move-controls .control-icon {
+  /* Nothing but an arrow on these two, so the arrow gets the whole button. */
+  width: 2.2rem;
+  height: 2.2rem;
 }
 .touch-controls button:active {
   transform: translate(3px, 3px);
@@ -621,7 +650,9 @@ legend,
 .action-controls {
   flex-wrap: wrap;
   justify-content: end;
-  max-width: 26rem;
+  /* Wide enough that the five action buttons stay on one row on an iPad in
+     landscape, so they cover as little of the ground as possible. */
+  max-width: 32rem;
 }
 
 @media (orientation: portrait) and (pointer: coarse) {
@@ -664,9 +695,20 @@ legend,
     flex-direction: column;
   }
   .touch-controls button {
-    min-width: 3.25rem;
-    min-height: 3.25rem;
-    font-size: 0.75rem;
+    min-width: 3.5rem;
+    min-height: 3.6rem;
+    padding: 0.35rem;
+  }
+  .touch-controls button span {
+    font-size: 0.6rem;
+  }
+  .control-icon {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+  .move-controls .control-icon {
+    width: 1.8rem;
+    height: 1.8rem;
   }
 }
 

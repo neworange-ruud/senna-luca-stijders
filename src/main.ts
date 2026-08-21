@@ -24,6 +24,7 @@ import {
   writeLearned,
   type HintId,
 } from "./client/hints.js";
+import { canClaimChest } from "./game/chests.js";
 import { teleportUnderPlayer } from "./game/teleports.js";
 import { TICK_RATE } from "./game/config.js";
 import { HEARTBEAT_INTERVAL_MS } from "./game/connection.js";
@@ -444,10 +445,11 @@ function renderHint(snapshot: GameSnapshot): void {
   const peer = match.players[activeRole === "luca" ? "senna" : "luca"];
   const arena = arenaForWorld(match.arenaId);
   const nearby = teleportUnderPlayer(own, arena);
+  // The hint now tells a child to tap the chest, so it has to appear exactly
+  // when a tap would work. Asking the same reach rule the claim uses keeps the
+  // tip, the ring around the chest, and the tap itself telling one story.
   const claimable = match.chests.some(
-    (chest) =>
-      snapshot.tick >= chest.landsAtTick &&
-      Math.abs(chest.position.x - (own.position.x + own.size.width / 2)) <= 160,
+    (chest) => snapshot.tick >= chest.landsAtTick && canClaimChest(own, chest),
   );
   const hint = chooseHint({
     phase: match.phase,
@@ -766,6 +768,21 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(
     sendInput();
   });
 }
+
+// A chest is opened by tapping the chest itself, which is the one thing on the
+// screen a child who cannot read still recognises. The tap only raises the same
+// Action control the button raises, so the room decides the claim and nothing
+// here can hand out a reward. Reach is checked before raising it so that a tap
+// meant for a chest can never ride a lift by accident.
+gameCanvas.addEventListener("pointerdown", (event) => {
+  if (!isPlaying()) return;
+  if (!renderer?.openableChestAt(event.clientX, event.clientY)) return;
+  event.preventDefault();
+  // The same source name the buttons use, so the window release below also
+  // ends a tap whose finger slid off the chest.
+  inputMapper.press(`pointer:${event.pointerId}`, "action");
+  sendInput();
+});
 
 // Disabling selection in CSS is not enough on iPadOS: a long press or a
 // two-finger sweep still begins one. Outside a text field there is nothing here

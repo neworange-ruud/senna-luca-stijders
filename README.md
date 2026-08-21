@@ -81,6 +81,10 @@ Platformen houden je alleen tegen van boven. Je kunt er dus van onderaf doorheen
 
 In de stad staan liften. Een lift gaat altijd naar de lift met dezelfde naam, en die naam staat er bij, dus je ziet waar je uitkomt zonder een menu. Ga op de lift staan en druk op Actie. Staat de andere speler precies op de uitgang, dan kom je er netjes naast te staan; is er helemaal geen plek, dan blijf je staan en kun je het meteen opnieuw proberen.
 
+Een kist open je door op de kist zelf te tikken. Zodra er een gele ring om de kist staat, is hij binnen bereik en doet een tik zijn werk; een tik ergens anders in het speelveld doet niets. De Actie-knop blijft ook gewoon werken, en is nog steeds de manier om een lift te nemen of een wapen van de grond te pakken.
+
+Op elke knop staat een plaatje naast het woord: een pijl omhoog voor springen, een knal voor aanvallen, een schild voor blokkeren, een hand voor Actie en twee pijlen voor wisselen. Zo herkent een kind dat nog niet leest de knop aan het plaatje. De plaatjes zitten in de pagina zelf en kunnen dus niet los van het spel wegvallen.
+
 Boven het speelveld staat steeds een korte tip, en niet meer dan een. De tip verdwijnt zodra je de knop een keer gebruikt hebt en komt daarna niet meer terug, ook niet in een volgende wedstrijd. Een kist of een lift binnen bereik gaat altijd voor.
 
 ## Testmodus

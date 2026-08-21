@@ -48,7 +48,7 @@ export function chooseHint(state: HintState): Hint | null {
     };
   }
   if (state.chestWithinReach) {
-    return { id: "chest", text: "Druk op Actie om de kist te openen." };
+    return { id: "chest", text: "Tik op de kist om hem te openen." };
   }
 
   const pending: readonly Hint[] = [
