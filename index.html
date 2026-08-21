@@ -182,60 +182,65 @@
           hidden
           aria-label="Speelveld"
         >
-          <div class="game-hud" aria-label="Spelstatus">
-            <div>
-              <strong>Jij</strong>
-              <span class="hearts" id="own-hearts" role="img"
-                >♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥</span
-              >
+          <!-- The status bar and the hint share one overlay layer above the
+               arena, so a hint appearing can never push the canvas out of the
+               stage and clip the ground the children stand on. -->
+          <div class="stage-top">
+            <div class="game-hud" aria-label="Spelstatus">
+              <div>
+                <strong>Jij</strong>
+                <span class="hearts" id="own-hearts" role="img"
+                  >♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥</span
+                >
+              </div>
+              <div>
+                <strong>Tegenstander</strong>
+                <span class="hearts" id="peer-hearts" role="img"
+                  >♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥</span
+                >
+              </div>
+              <div class="weapon-slot">
+                <strong>Wapen</strong>
+                <span id="weapon-status">Vuisten</span>
+              </div>
+              <div class="effect-slot">
+                <strong>Krachten</strong>
+                <span id="effect-status">Geen</span>
+              </div>
+              <div class="world-slot">
+                <strong>Wereld</strong>
+                <span id="world-status">Strand</span>
+              </div>
+              <div class="quality">
+                <strong>Verbinding</strong>
+                <span id="quality-status">Meten...</span>
+              </div>
+              <div>
+                <strong>Zoeken</strong>
+                <span id="opponent-status">Tegenstander zoeken...</span>
+              </div>
+              <div id="protection-status" hidden>Veilig na terugkeer</div>
+              <div class="sound-controls">
+                <button id="effects-toggle" type="button" aria-pressed="false">
+                  Geluid aan
+                </button>
+                <button id="music-toggle" type="button" aria-pressed="false">
+                  Muziek uit
+                </button>
+              </div>
+              <button id="pause-button" type="button">Pauze</button>
             </div>
-            <div>
-              <strong>Tegenstander</strong>
-              <span class="hearts" id="peer-hearts" role="img"
-                >♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥</span
-              >
-            </div>
-            <div class="weapon-slot">
-              <strong>Wapen</strong>
-              <span id="weapon-status">Vuisten</span>
-            </div>
-            <div class="effect-slot">
-              <strong>Krachten</strong>
-              <span id="effect-status">Geen</span>
-            </div>
-            <div class="world-slot">
-              <strong>Wereld</strong>
-              <span id="world-status">Strand</span>
-            </div>
-            <div class="quality">
-              <strong>Verbinding</strong>
-              <span id="quality-status">Meten...</span>
-            </div>
-            <div>
-              <strong>Zoeken</strong>
-              <span id="opponent-status">Tegenstander zoeken...</span>
-            </div>
-            <div id="protection-status" hidden>Veilig na terugkeer</div>
-            <div class="sound-controls">
-              <button id="effects-toggle" type="button" aria-pressed="false">
-                Geluid aan
-              </button>
-              <button id="music-toggle" type="button" aria-pressed="false">
-                Muziek uit
-              </button>
-            </div>
-            <button id="pause-button" type="button">Pauze</button>
+            <p
+              id="hint-line"
+              class="hint"
+              role="status"
+              aria-live="polite"
+              hidden
+            >
+              <span class="hint-icon" aria-hidden="true">?</span>
+              <span id="hint-text"></span>
+            </p>
           </div>
-          <p
-            id="hint-line"
-            class="hint"
-            role="status"
-            aria-live="polite"
-            hidden
-          >
-            <span class="hint-icon" aria-hidden="true">?</span>
-            <span id="hint-text"></span>
-          </p>
           <canvas
             id="game-canvas"
             aria-label="Arena met Luca en Senna"
