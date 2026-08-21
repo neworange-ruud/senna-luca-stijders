@@ -14,6 +14,7 @@ import type {
   MatchEvent,
   PlayerRole,
   PlayerState,
+  Vector,
   Rectangle,
 } from "./types.js";
 import { CHEST_OUTCOMES } from "./types.js";
@@ -202,6 +203,59 @@ function chestBody(chest: ChestState): Rectangle {
 }
 
 /**
+ * Whether this player stands close enough to open this chest. The authoritative
+ * claim and the browser's decision about what a tap on a chest means both ask
+ * this one question, so the two can never disagree about reach.
+ */
+export function canClaimChest(player: PlayerState, chest: ChestState): boolean {
+  return (
+    player.health > 0 && intersects(claimRectangle(player), chestBody(chest))
+  );
+}
+
+function containsPoint(area: Rectangle, point: Vector): boolean {
+  return (
+    point.x >= area.x &&
+    point.x <= area.x + area.width &&
+    point.y >= area.y &&
+    point.y <= area.y + area.height
+  );
+}
+
+/**
+ * The chest a tap at this world point is aimed at, or null. The body is grown
+ * by a tolerance because a child aims at the drawing, and the nearest centre
+ * wins when two chests are close enough to overlap.
+ */
+export function chestAtPoint(
+  chests: readonly ChestState[],
+  point: Vector,
+  tolerance: number = CHESTS.tapTolerance,
+): ChestState | null {
+  let best: ChestState | null = null;
+  let bestGap = Number.POSITIVE_INFINITY;
+  for (const chest of chests) {
+    const body = chestBody(chest);
+    const target: Rectangle = {
+      x: body.x - tolerance,
+      y: body.y - tolerance,
+      width: body.width + tolerance * 2,
+      height: body.height + tolerance * 2,
+    };
+    if (!containsPoint(target, point)) continue;
+    const gap = Math.hypot(
+      point.x - (body.x + body.width / 2),
+      point.y - (body.y + body.height / 2),
+    );
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = chest;
+    }
+  }
+  return best;
+}
+
+/**
  * Picks the single player who claims a chest on this tick: reach first, then
  * the shortest distance, then an alternating tie-break so an exact tie does not
  * always fall to the same child.
@@ -212,10 +266,7 @@ export function chestClaimant(
   tick: number,
 ): PlayerRole | null {
   const contenders = ROLES.map((role) => state.match.players[role]).filter(
-    (player) =>
-      wantsAction(player) &&
-      player.health > 0 &&
-      intersects(claimRectangle(player), chestBody(chest)),
+    (player) => wantsAction(player) && canClaimChest(player, chest),
   );
   if (contenders.length === 0) return null;
   const sorted = [...contenders].sort((first, second) => {

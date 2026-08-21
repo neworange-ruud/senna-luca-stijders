@@ -1,5 +1,6 @@
 import { arenaForWorld, COSMETICS, WORLDS } from "../game/content.js";
 import { cameraTarget, followCamera, type Camera } from "../game/camera.js";
+import { canClaimChest, chestAtPoint } from "../game/chests.js";
 import { CHESTS } from "../game/config.js";
 import { CHEST_LABELS } from "../game/content.js";
 import { hasEffect } from "../game/effects.js";
@@ -132,6 +133,29 @@ export class CanvasRenderer {
     this.prediction.setIntent(sequence, intent);
   }
 
+  /**
+   * The chest that a tap at this screen point opens, or null when the tap was
+   * not aimed at one or this child is still too far away to reach it. The
+   * camera and the predicted position both live here, so the page asks one
+   * question instead of rebuilding the projection itself. The answer only
+   * decides whether to raise the Action control: the room still judges the
+   * claim, exactly as it does when the button is pressed.
+   */
+  openableChestAt(clientX: number, clientY: number): ChestState | null {
+    const snapshot = this.snapshot;
+    if (!snapshot) return null;
+    const box = this.canvas.getBoundingClientRect();
+    const chest = chestAtPoint(snapshot.state.match.chests, {
+      x: clientX - box.left + this.camera.x,
+      y: clientY - box.top + this.camera.y,
+    });
+    if (!chest) return null;
+    const player =
+      this.prediction.predictedPlayer ??
+      snapshot.state.match.players[this.role];
+    return canClaimChest(player, chest) ? chest : null;
+  }
+
   start(): void {
     if (!this.requestId)
       this.requestId = requestAnimationFrame((now) => this.render(now));
@@ -217,7 +241,7 @@ export class CanvasRenderer {
     this.drawSurfaces(context);
     this.drawTeleports(context, now);
     for (const chest of snapshot.state.match.chests) {
-      this.drawChest(context, chest, snapshot.tick, now);
+      this.drawChest(context, chest, snapshot.tick, now, localPlayer);
     }
     for (const entity of snapshot.state.match.entities) {
       if (!this.isVisible({ ...entity.position, ...entity.size })) continue;
@@ -623,6 +647,7 @@ export class CanvasRenderer {
     chest: ChestState,
     tick: number,
     now: number,
+    localPlayer: PlayerState,
   ): void {
     const size = 64;
     const landed = tick >= chest.landsAtTick;
@@ -652,6 +677,29 @@ export class CanvasRenderer {
       context.setLineDash([]);
     }
 
+    // A chest close enough to open gets a ring around it, so a child who
+    // cannot read the label still sees which one their finger can reach.
+    const openable = landed && canClaimChest(localPlayer, chest);
+    if (openable) {
+      const pulse = this.reducedMotion ? 0.5 : (Math.sin(now / 200) + 1) / 2;
+      context.save();
+      context.strokeStyle = "#f5bd34";
+      context.lineWidth = 5 + pulse * 3;
+      context.globalAlpha = 0.55 + pulse * 0.45;
+      context.beginPath();
+      context.ellipse(
+        chest.position.x,
+        y + size / 2,
+        size * 0.72 + pulse * 5,
+        size * 0.72 + pulse * 5,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      context.stroke();
+      context.restore();
+    }
+
     const icon = this.images.get("icon:chest");
     if (icon) {
       context.drawImage(icon, x, y, size, size);
@@ -662,11 +710,13 @@ export class CanvasRenderer {
       context.lineWidth = 4;
       context.strokeRect(x, y, size, size);
     }
+    // A finger opens the chest now, so the label says so rather than naming a
+    // button. It stays short: the picture and the ring carry the meaning.
     context.fillStyle = "#10283b";
     context.font = "900 20px system-ui";
     context.textAlign = "center";
     context.fillText(
-      landed ? "Kist! Pak op" : "Kist komt...",
+      openable ? "Tik op de kist!" : landed ? "Kist!" : "Kist komt...",
       chest.position.x,
       y - 12,
     );
