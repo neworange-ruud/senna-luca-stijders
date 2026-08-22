@@ -801,6 +801,70 @@ for (const eventName of ["selectstart", "contextmenu", "dragstart"] as const) {
   document.addEventListener(eventName, refuseSelection);
 }
 
+// Refusing the gesture is not the same as there being no selection: iPadOS can
+// still end up with one, and the moment it does it floats a callout bar over
+// the arena offering to copy, look up, or share it. That bar is the "Deel..."
+// button the children keep finding mid-fight. Anything selected outside a text
+// field is unselected again straight away, which takes the bar with it.
+document.addEventListener("selectionchange", () => {
+  // A field being typed in owns its own selection, and browsers disagree about
+  // whether that selection is even visible here, so the field having focus is
+  // the reliable half of this test and is asked first.
+  const focused = document.activeElement;
+  if (
+    focused instanceof HTMLInputElement ||
+    focused instanceof HTMLTextAreaElement
+  )
+    return;
+  const selection = getSelection();
+  if (!selection || selection.isCollapsed) return;
+  selection.removeAllRanges();
+});
+
+// The other half of the same offer needs no selection at all: a finger resting
+// on a picture makes iOS propose saving or sharing it, and to iOS the arena is
+// a picture. Only refusing the touch outright stops the offer being made. It is
+// refused across the whole stage, but not on the few controls in there that
+// still need the browser to turn a tap into a click, and nowhere else on the
+// page, because a refused touch is also a lobby that will not scroll.
+gameStage.addEventListener(
+  "touchstart",
+  (event) => {
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest("a, input, select, textarea, button:not([data-control])")
+    )
+      return;
+    event.preventDefault();
+  },
+  { passive: false },
+);
+
+// The scale is fixed for the whole match. The viewport meta asks for that and
+// CSS refuses the touches that would change it, but Safari still delivers its
+// own pinch and rotate gestures, and a keyboard or a trackpad can zoom without
+// touching the screen at all. Every one of those routes is closed, so the arena
+// a child is looking at is always the whole arena.
+function refuseZoom(event: Event): void {
+  event.preventDefault();
+}
+
+for (const eventName of ["gesturestart", "gesturechange", "gestureend"]) {
+  document.addEventListener(eventName, refuseZoom, { passive: false });
+}
+window.addEventListener(
+  "wheel",
+  (event) => {
+    if (event.ctrlKey) event.preventDefault();
+  },
+  { passive: false },
+);
+window.addEventListener("keydown", (event) => {
+  if (!event.ctrlKey && !event.metaKey) return;
+  if (["+", "=", "-", "_", "0"].includes(event.key)) event.preventDefault();
+});
+
 // The release is heard on the window, not on the button. A finger that slides
 // off a control, or a gesture the browser takes over, would otherwise never
 // deliver the release, and the control would stay held down for the rest of the

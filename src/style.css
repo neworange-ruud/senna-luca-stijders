@@ -1,4 +1,6 @@
 :root {
+  /* How much sky is left around the framed arena on every side. */
+  --arena-margin: 1.4rem;
   color: #10283b;
   background: #f4edda;
   font-family:
@@ -8,6 +10,17 @@
 
 * {
   box-sizing: border-box;
+}
+html,
+body {
+  /* The game is laid out for one fixed scale. A pinch, a double tap, or Safari
+     inflating the text on its own all leave a child looking at a corner of the
+     arena with no way back, so every route to a different scale is closed here.
+     Panning is still allowed, because the lobby is taller than a screen; only
+     zooming is refused. */
+  touch-action: pan-x pan-y;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 body {
   min-width: 320px;
@@ -33,6 +46,16 @@ input,
 textarea {
   -webkit-user-select: text;
   user-select: text;
+}
+/* A finger resting on a picture or a link is an offer to save or share it on
+   iOS, and the callout carrying that offer lands on top of the fight. A canvas
+   counts as a picture, so the arena is the likeliest thing a child holds. */
+a,
+canvas,
+img,
+svg {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 button,
 input {
@@ -385,12 +408,23 @@ legend,
   position: fixed;
   z-index: 5;
   inset: 0;
-  display: block;
+  /* The arena is a framed picture rather than the whole screen: a margin all
+     round lets its border and drop shadow read as a frame, and keeps the edge
+     of the world clear of the rounded corners and the front-facing camera side
+     of an iPad. The grid is what holds it in the middle when the screen is a
+     different shape from the arena. */
+  display: grid;
+  /* One full-size cell, replacing the two-column lobby layout this rule
+     inherits: the stage is the only child left on screen and it gets the whole
+     of the padded box. */
+  grid-template: 1fr / 1fr;
+  place-items: center;
+  gap: 0;
   min-height: 0;
-  padding: max(0.5rem, env(safe-area-inset-top))
-    max(0.5rem, env(safe-area-inset-right))
-    max(0.5rem, env(safe-area-inset-bottom))
-    max(0.5rem, env(safe-area-inset-left));
+  padding: max(var(--arena-margin), env(safe-area-inset-top))
+    max(var(--arena-margin), env(safe-area-inset-right))
+    max(var(--arena-margin), env(safe-area-inset-bottom))
+    max(var(--arena-margin), env(safe-area-inset-left));
   background: #89d5e8;
 }
 .player-view[data-phase="playing"] > :not(.game-stage),
@@ -578,24 +612,33 @@ legend,
   font-weight: 800;
 }
 .touch-controls {
+  /* One of the two iPads has a strip along the right-hand edge that no longer
+     answers a finger, so nothing a child has to hit may sit against a side.
+     The width of two controls is kept clear at each end; the same room on the
+     left is not needed, but a lopsided pair of clusters looks like a mistake. */
+  --control-size: 4.5rem;
+  --control-gap: 0.65rem;
+  --control-edge: calc(2 * var(--control-size) + 2 * var(--control-gap));
   position: absolute;
   inset: auto 0 0;
   display: flex;
   align-items: end;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem max(1rem, env(safe-area-inset-right))
-    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  padding: 1rem
+    calc(var(--control-edge) + max(1rem, env(safe-area-inset-right)))
+    max(1rem, env(safe-area-inset-bottom))
+    calc(var(--control-edge) + max(1rem, env(safe-area-inset-left)));
   pointer-events: none;
 }
 .touch-controls > div {
   display: flex;
-  gap: 0.65rem;
+  gap: var(--control-gap);
   pointer-events: auto;
 }
 .touch-controls button {
   /* Comfortably above the 44 pixel minimum, with small fingers in mind. */
-  min-width: 4.5rem;
+  min-width: var(--control-size);
   min-height: 4.25rem;
   display: grid;
   justify-items: center;
@@ -694,8 +737,10 @@ legend,
     align-items: stretch;
     flex-direction: column;
   }
+  .touch-controls {
+    --control-size: 3.5rem;
+  }
   .touch-controls button {
-    min-width: 3.5rem;
     min-height: 3.6rem;
     padding: 0.35rem;
   }
@@ -777,6 +822,10 @@ body[data-test-mode="aan"] .player-view[data-phase="finished"] {
   border-radius: 0.7rem;
   background: white;
   font: inherit;
+  /* After the shorthand, never before it. Under 16 pixels Safari zooms the whole
+     page in when the field takes focus and never zooms back out; the small
+     uppercase label above it is not a focus target, so it stays as it is. */
+  font-size: 1rem;
   font-weight: 900;
   text-transform: none;
 }
