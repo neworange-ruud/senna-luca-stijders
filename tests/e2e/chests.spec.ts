@@ -60,19 +60,79 @@ async function spawnChest(
 }
 
 /**
- * Holds the on-screen Action control, which is how the children open a chest.
- * Keyboard events need the page to be focused, and with two browser contexts on
- * a busy machine that focus is not guaranteed; a pointer on the control is.
+ * Presses the on-screen Action control once. Keyboard events need the page to
+ * be focused, and with two browser contexts on a busy machine that focus is not
+ * guaranteed; a pointer on the control is. One press is enough because the room
+ * remembers it until a tick uses it, and it is safer than holding: a held
+ * control keeps acting every tick afterwards.
  */
-async function holdAction(page: Page): Promise<() => Promise<void>> {
+async function pressAction(page: Page): Promise<void> {
   const box = await page.getByRole("button", { name: "Actie" }).boundingBox();
   const x = (box?.x ?? 0) + (box?.width ?? 0) / 2;
   const y = (box?.y ?? 0) + (box?.height ?? 0) / 2;
   await page.mouse.move(x, y);
   await page.mouse.down();
-  return async () => {
-    await page.mouse.up();
-  };
+  await page.mouse.up();
+}
+
+/**
+ * Lets both children back in if this run tripped the connection freeze, and
+ * reports that it happened. A shared build machine can stall a browser long
+ * enough for the room to call it absent, which freezes the match for both of
+ * them until they each say they are ready. That is real product behaviour with
+ * its own journey in `lifecycle.spec.ts`; here it is only noise, and it is
+ * ruinous noise, because a frozen match does not tick and so a chest that is
+ * still falling never lands.
+ */
+async function clearConnectionFreeze(pages: readonly Page[]): Promise<void> {
+  let frozen = false;
+  for (const page of pages) {
+    const eyebrow = await page.locator("#overlay-eyebrow").textContent();
+    if (
+      (await page.locator("#stage-overlay").isVisible()) &&
+      eyebrow?.trim() === "Verbinding"
+    ) {
+      frozen = true;
+    }
+  }
+  if (!frozen) return;
+  console.log("CONNECTION_FREEZE_CLEARED");
+  for (const page of pages) {
+    const resume = page.locator("#overlay-action");
+    if (await resume.isVisible()) await resume.click();
+  }
+  for (const page of pages) {
+    await expect(page.locator("#phase-status")).toHaveText("Spelen", {
+      timeout: 30_000,
+    });
+  }
+}
+
+/**
+ * Waits until the chest beside this player has landed and is genuinely within
+ * reach. The tip is what proves both of those: the page only offers it when a
+ * claim would actually be granted.
+ */
+async function waitForLandedChest(
+  page: Page,
+  pages: readonly Page[],
+): Promise<void> {
+  await expect(async () => {
+    await clearConnectionFreeze(pages);
+    await expect(page.locator("#hint-text")).toHaveText(
+      "Tik op de kist om hem te openen.",
+      { timeout: 2_000 },
+    );
+  }).toPass({ timeout: 40_000 });
+}
+
+/** Waits for the chest to be openable, then opens it with one press. */
+async function openLandedChest(
+  page: Page,
+  pages: readonly Page[],
+): Promise<void> {
+  await waitForLandedChest(page, pages);
+  await pressAction(page);
 }
 
 async function moveTo(
@@ -114,12 +174,10 @@ test("a match delivers every chest outcome to the player who opens it", async ({
   ];
   for (const [outcome, weapon] of expectations) {
     await spawnChest(request, outcome, "luca");
-    // Holding Action claims the chest on the tick after it lands.
-    const release = await holdAction(luca);
+    await openLandedChest(luca, [luca, senna]);
     await expect(luca.locator("#weapon-status")).toHaveText(weapon, {
       timeout: 10_000,
     });
-    await release();
   }
 
   const powers: [string, RegExp][] = [
@@ -129,13 +187,12 @@ test("a match delivers every chest outcome to the player who opens it", async ({
   ];
   for (const [outcome, label] of powers) {
     await spawnChest(request, outcome, "luca");
-    const release = await holdAction(luca);
+    await openLandedChest(luca, [luca, senna]);
     await expect
       .poll(() => luca.locator("#effect-status").getAttribute("aria-label"), {
         timeout: 10_000,
       })
       .toMatch(label);
-    await release();
   }
 
   // The opponent sees the same authoritative rewards on their own device.
@@ -171,10 +228,7 @@ test("a chest is opened by tapping the chest itself", async ({
   await spawnChest(request, "sword", "luca");
   // This tip only appears once the chest has landed and is genuinely in reach,
   // which is exactly the moment a tap is supposed to start working.
-  await expect(luca.locator("#hint-text")).toHaveText(
-    "Tik op de kist om hem te openen.",
-    { timeout: 10_000 },
-  );
+  await waitForLandedChest(luca, [luca, senna]);
 
   /**
    * Where the chest is drawn. Luca stands at the western point, so the camera
