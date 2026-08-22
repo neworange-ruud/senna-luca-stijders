@@ -2,9 +2,13 @@
 <html lang="nl">
   <head>
     <meta charset="UTF-8" />
+    <!-- The scale is pinned at both ends: a child who pinches, double taps, or
+         rests two fingers on the arena mid-fight must not end up playing a
+         zoomed-in game they cannot get out of again. iPadOS may ignore this on
+         its own, so the gestures are refused in CSS and in script as well. -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <meta name="theme-color" content="#10283b" />
     <title>Senna &amp; Luca Strijders</title>
